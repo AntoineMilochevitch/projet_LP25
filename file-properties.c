@@ -42,24 +42,9 @@ int get_file_stats(files_list_entry_t *entry) {
     } else if (S_ISREG(sb.st_mode)) {
         entry->entry_type = FICHIER;
 
-        FILE *file = fopen(path, "rb");
-        if (file == NULL) {
+        if (compute_file_md5(entry) == -1) {
             return -1;
         }
-
-        MD5_CTX md5_ctx;
-        MD5_Init(&md5_ctx);
-
-        unsigned char data[1024];
-        int bytes;
-
-        while ((bytes = fread(data, 1, 1024, file)) != 0) {
-            MD5_Update(&md5_ctx, data, bytes);
-        }
-
-        MD5_Final(entry->md5sum, &md5_ctx);
-
-        fclose(file);
     } else {
         return -1;
     }
