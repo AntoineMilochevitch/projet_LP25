@@ -1,18 +1,18 @@
-CC=gcc
-CFLAGS=-O2 -Wall
-LDFLAGS=-lcrypto
-INC=-I.
+CC = gcc
+CFLAGS = -Wall -Wextra -I/usr/include
+LDFLAGS = -lssl -lcrypto
 
-all: lp25-backup
+SRC = $(wildcard *.c)
+OBJ = $(SRC:.c=.o)
+EXECUTABLE = prg
 
-%.o: %.c %.h
-	$(CC) $(CFLAGS) $(INC) -c $< -o $@
+all: $(EXECUTABLE)
 
-file-properties.o: file-properties.c file-properties.h
-	$(CC) $(CFLAGS) -std=c11 $(INC) -c $< -o $@
+$(EXECUTABLE): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) -o $@ $(LDFLAGS)
 
-lp25-backup: main.c files-list.o sync.o configuration.o file-properties.o processes.o messages.o utility.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) -o $@ $^
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f *.o lp25-backup
+	rm -f $(OBJ) $(EXECUTABLE)
