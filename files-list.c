@@ -1,9 +1,10 @@
-#include <files-list.h>
+#include "files-list.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <stdio.h>
+
 
 /*!
  * @brief clear_files_list clears a files list
@@ -28,7 +29,22 @@ void clear_files_list(files_list_t *list) {
  *  @return 0 if success, -1 else (out of memory)
  */
 files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
+    struct stat st;
+    if (stat(file_path, &st) != 0) {
+        return -1;
+    }
+
+    files_list_entry_t* new_entry = malloc(sizeof(files_list_entry_t));
+    if (new_entry == NULL) {
+        return -1;
+    }
+
+    strncpy(new_entry->path_and_name, file_path, sizeof(new_entry->path_and_name));
+    get_file_stats(new_entry);
+    add_entry_to_tail(list, new_entry);
+    return 0;
 }
+
 
 /*!
  * @brief add_entry_to_tail adds an entry directly to the tail of the list
@@ -39,7 +55,20 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
  * @return 0 in case of success, -1 else
  */
 int add_entry_to_tail(files_list_t *list, files_list_entry_t *entry) {
+    if (entry == NULL) {
+        return -1;
+    }
+    entry->next = NULL;
+    entry->prev = list->tail;
+    if (list->head == NULL) {
+        list->head = entry;
+    } else {
+        list->tail->next = entry;
+    }
+    list->tail = entry;
+    return 0;
 }
+
 
 /*!
  *  @brief find_entry_by_name looks up for a file in a list
@@ -51,6 +80,14 @@ int add_entry_to_tail(files_list_t *list, files_list_entry_t *entry) {
  *  @return a pointer to the element found, NULL if none were found.
  */
 files_list_entry_t *find_entry_by_name(files_list_t *list, char *file_path, size_t start_of_src, size_t start_of_dest) {
+    files_list_entry_t* cursor = list->head;
+    while (cursor != NULL) {
+        if (strcmp(cursor->path_and_name + start_of_src, file_path + start_of_dest) == 0) {
+            return cursor;
+        }
+        cursor = cursor->next;
+    }
+    return NULL;
 }
 
 /*!

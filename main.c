@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <assert.h>
-#include <sync.h>
-#include <configuration.h>
-#include <file-properties.h>
-#include <processes.h>
+#include "sync.h"
+#include "configuration.h"
+#include "file-properties.h"
+#include "processes.h"
 #include <unistd.h>
+#include <sys/stat.h>
 
 /*!
  * @brief main function, calling all the mechanics of the program
@@ -19,6 +20,11 @@ int main(int argc, char *argv[]) {
     // - source exists and can be read
     // - destination exists and can be written OR doesn't exist but can be created
     // - other options with getopt (see instructions)
+    if (argc < 3) {
+        printf("Usage: %s source destination [option]\n", argv[0]);
+        return -1;
+    }
+
     configuration_t my_config;
     init_configuration(&my_config);
     if (set_configuration(&my_config, argc, argv) == -1) {

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include "file-properties.h"
 
 typedef enum { FICHIER, DOSSIER } file_type_t;
 

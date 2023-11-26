@@ -1,4 +1,4 @@
-#include <configuration.h>
+#include "configuration.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -25,6 +25,14 @@ void display_help(char *my_name) {
  * @param the_config is a pointer to the configuration to be initialized
  */
 void init_configuration(configuration_t *the_config) {
+    if (the_config == NULL) {
+        return;
+    }
+    the_config->source[0] = '\0';
+    the_config->destination[0] = '\0'; 
+    the_config->processes_count = 1;
+    the_config->is_parallel = true;
+    the_config->uses_md5 = true;
 }
 
 /*!
@@ -35,4 +43,45 @@ void init_configuration(configuration_t *the_config) {
  * @return -1 if configuration cannot succeed, 0 when ok
  */
 int set_configuration(configuration_t *the_config, int argc, char *argv[]) {
+    int opt;
+    struct option long_options[] = {
+        {"date-size-only", no_argument,       0, 'd'},
+        {"no-parallel",    no_argument,       0, 'p'},
+        {"dry-run",        no_argument,       0, 'r'},
+        {"verbose",        no_argument,       0, 'v'},
+        {"n",              required_argument, 0, 'n'},
+        {0, 0, 0, 0}
+    };
+
+    while ((opt = getopt_long(argc, argv, "dpvrn:", long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'd':
+                the_config->uses_md5 = false;
+                break;
+            case 'p':
+                the_config->is_parallel = false;
+                break;
+            case 'r':
+                // handle dry-run option
+                break;
+            case 'v':
+                // handle verbose option
+                break;
+            case 'n':
+                the_config->processes_count = atoi(optarg);
+                break;
+            default:
+                return -1;
+        }
+    }
+
+    // Copy remaining arguments to source and destination
+    if (optind < argc) {
+        strncpy(the_config->source, argv[optind++], sizeof(the_config->source));
+        if (optind < argc) {
+            strncpy(the_config->destination, argv[optind++], sizeof(the_config->destination));
+        }
+    }
+
+    return 0;
 }

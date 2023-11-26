@@ -1,4 +1,4 @@
-#include <file-properties.h>
+#include "file-properties.h"
 
 #include <sys/stat.h>
 #include <dirent.h>
@@ -6,10 +6,10 @@
 #include <unistd.h>
 #include <assert.h>
 #include <string.h>
-#include <defines.h>
+#include "defines.h"
 #include <fcntl.h>
 #include <stdio.h>
-#include <utility.h>
+#include "utility.h"
 
 /*!
  * @brief get_file_stats gets all of the required information for a file (inc. directories)
@@ -27,6 +27,44 @@
  * @return -1 in case of error, 0 else
  */
 int get_file_stats(files_list_entry_t *entry) {
+    struct stat sb;
+
+    if (lstat(path, &sb) == -1) {
+        return -1;
+    }
+
+    entry->mtime = sb.st_mtim;
+    entry->size = sb.st_size;
+    entry->mode = sb.st_mode;
+
+    if (S_ISDIR(sb.st_mode)) {
+        entry->entry_type = DOSSIER;
+    } else if (S_ISREG(sb.st_mode)) {
+        entry->entry_type = FICHIER;
+
+        FILE *file = fopen(path, "rb");
+        if (file == NULL) {
+            return -1;
+        }
+
+        MD5_CTX md5_ctx;
+        MD5_Init(&md5_ctx);
+
+        unsigned char data[1024];
+        int bytes;
+
+        while ((bytes = fread(data, 1, 1024, file)) != 0) {
+            MD5_Update(&md5_ctx, data, bytes);
+        }
+
+        MD5_Final(entry->md5sum, &md5_ctx);
+
+        fclose(file);
+    } else {
+        return -1;
+    }
+
+    return 0;
 }
 
 /*!
@@ -44,6 +82,12 @@ int compute_file_md5(files_list_entry_t *entry) {
  * @return true if directory exists, false else
  */
 bool directory_exists(char *path_to_dir) {
+    struct stat sb;
+    if (stat(path_to_dir, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /*!
@@ -53,4 +97,17 @@ bool directory_exists(char *path_to_dir) {
  * Hint: try to open a file in write mode in the target directory.
  */
 bool is_directory_writable(char *path_to_dir) {
+    char test_file[PATH_SIZE];
+    if (concat_path(test_file, path_to_dir, "testfile.tmp") == NULL) {
+        return false;
+    }
+
+    FILE *file = fopen(test_file, "w");
+    if (file != NULL) {
+        fclose(file);
+        remove(test_file);
+        return true;
+    } else {
+        return false;
+    }    
 }
