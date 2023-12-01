@@ -34,15 +34,34 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
         return -1;
     }
 
-    files_list_entry_t* new_entry = malloc(sizeof(files_list_entry_t));
+    files_list_entry_t *new_entry = malloc(sizeof(files_list_entry_t));
     if (new_entry == NULL) {
         return -1;
     }
-
+    files_list_entry_t *temp = list->head;
     strncpy(new_entry->path_and_name, file_path, sizeof(new_entry->path_and_name));
     get_file_stats(new_entry);
-    add_entry_to_tail(list, new_entry);
-    return 0;
+    
+    while (temp->next != NULL) {
+        if (strcmp(temp->path_and_name, file_path) == 0) {
+            return 0;
+        }else {
+            if (strcmp(temp->path_and_name, file_path) < 0 ) {
+                new_entry->prev = temp;
+                new_entry->next = temp->next;
+                temp->next = new_entry;
+                return 0;
+            }else {
+                temp = temp->next;
+            }
+        }
+    }
+    if (temp->next == NULL) {
+        temp->next = new_entry;
+        new_entry->prev = temp;
+        new_entry->next = NULL;
+        return 0;
+    }
 }
 
 

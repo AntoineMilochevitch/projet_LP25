@@ -1,9 +1,9 @@
 #pragma once
 
-#include <configuration.h>
+#include "configuration.h"
 #include <sys/ipc.h>
 #include <sys/types.h>
-#include <files-list.h>
+#include "files-list.h"
 #include <stdbool.h>
 
 typedef struct {

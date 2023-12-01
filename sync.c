@@ -1,10 +1,10 @@
-#include <sync.h>
+#include "sync.h"
 #include <dirent.h>
 #include <string.h>
-#include <processes.h>
-#include <utility.h>
-#include <messages.h>
-#include <file-properties.h>
+#include "processes.h"
+#include "utility.h"
+#include "messages.h"
+#include "file-properties.h"
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/sendfile.h>

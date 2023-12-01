@@ -1,7 +1,7 @@
 #pragma once
 
-#include <files-list.h>
-#include <defines.h>
+#include "files-list.h"
+#include "defines.h"
 
 #define COMMAND_CODE_TERMINATE 0x0
 #define COMMAND_CODE_TERMINATE_OK 0x10

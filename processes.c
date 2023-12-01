@@ -3,9 +3,9 @@
 #include <unistd.h>
 #include <sys/msg.h>
 #include <stdio.h>
-#include <messages.h>
-#include <file-properties.h>
-#include <sync.h>
+#include "messages.h"
+#include "file-properties.h"
+#include "sync.h"
 #include <string.h>
 #include <errno.h>
 
