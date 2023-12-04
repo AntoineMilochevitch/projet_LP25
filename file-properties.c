@@ -28,12 +28,12 @@
  */
 int get_file_stats(files_list_entry_t *entry) {
     struct stat sb;
-
+    char path = entry->path_and_name;
     if (lstat(path, &sb) == -1) {
         return -1;
     }
 
-    entry->mtime = sb.st_mtim;
+    entry->mtime.tv_nsec = sb.st_mtime;
     entry->size = sb.st_size;
     entry->mode = sb.st_mode;
 
