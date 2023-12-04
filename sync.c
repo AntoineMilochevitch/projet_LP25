@@ -31,6 +31,39 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
  * @return true if both files are not equal, false else
  */
 bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
+    // Ici, EOF = end of file, caractèr marquant la fin d'un fichier
+    if (has_md5) {
+        for (int i = 0; i < 16; ++i) {
+            if (lhd->md5sum[i] != rhd->md5sum[i]) {
+                return true;
+            }
+        }
+    } else {
+        FILE *file1 = fopen(lhd->path_and_name, "rb");
+        FILE *file2 = fopen(rhd->path_and_name, "rb");
+
+        if (file1 == NULL || file2 == NULL) {
+            if (file1) fclose(file1);
+            if (file2) fclose(file2);
+            fprintf(stderr, "[MISMATCH TEST] : un des 2 fichier n'a pas pu être ouvert\n");
+            exit(-1);
+        }
+        char char1, char2;
+
+        while ((strcpy(char1, fgetc(file1))) != EOF && (strcpy(char2,fgetc(file2))) != EOF) {
+            if (strcmp(char1,char2) != 0) {
+                return true;
+                break; // sort de la fonction lors de la détection d'une différence
+            }
+        }
+        // Si la longueur des fichiers est différente
+        if ((char1 == EOF && char2 != EOF) || (char1 != EOF && char2 == EOF)) {
+            return true;
+        }
+        fclose(file1);
+        fclose(file2);
+    }
+    return false;
 }
 
 /*!
