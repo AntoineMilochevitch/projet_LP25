@@ -29,10 +29,6 @@ void clear_files_list(files_list_t *list) {
  *  @return 0 if success, -1 else (out of memory)
  */
 files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
-    struct stat st;
-    if (stat(file_path, &st) != 0) {
-        return -1;
-    }
 
     files_list_entry_t *new_entry = malloc(sizeof(files_list_entry_t));
     if (new_entry == NULL) {
@@ -40,7 +36,6 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
     }
     files_list_entry_t *temp = list->head;
     strncpy(new_entry->path_and_name, file_path, sizeof(new_entry->path_and_name));
-    get_file_stats(new_entry);
     
     while (temp->next != NULL) {
         if (strcmp(temp->path_and_name, file_path) == 0) {

@@ -67,11 +67,38 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
 }
 
 /*!
- * @brief make_files_list buils a files list in no parallel mode
+ * @brief make_files_list builds a files list in no parallel mode
  * @param list is a pointer to the list that will be built
  * @param target_path is the path whose files to list
  */
 void make_files_list(files_list_t *list, char *target_path) {
+    DIR *dir;
+    struct dirent *entry;
+
+    if ((dir = opendir(target_path)) == NULL) {
+        perror("Unable to open directory");
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        char path[PATH_SIZE];
+        if (concat_path(path, target_path, entry->d_name) == NULL) {
+            perror("Unable to concatenate path");
+            continue;
+        }  
+
+        files_list_entry_t *new_entry = malloc(sizeof(files_list_entry_t));
+        if (new_entry == NULL) {
+            perror("Unable to allocate memory for new file entry");
+            continue;
+        }
+
+        if (add_file_entry(list, path) != 0) {
+            perror("Unable to add file entry to list");
+        }
+    }
+
+    closedir(dir);
 }
 
 /*!
@@ -101,6 +128,7 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
  * @param target is the target dir whose content must be listed
  */
 void make_list(files_list_t *list, char *target) {
+    
 }
 
 /*!
