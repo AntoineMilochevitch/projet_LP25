@@ -127,19 +127,18 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
  * @param target is the target dir whose content must be listed
  */
 void make_list(files_list_t *list, char *target) {
-    DIR *directory = open_dir(target); //a voir si target est ok
+    DIR *directory = open_dir(target);
     if (directory == NULL){
         return;
     }
-    struct dirent *entry;
-    do{
+    struct dirent *entry = get_next_entry(directory);
+    while (entry != NULL){
+        char path[PATH_SIZE];
+        concat_path(path, target, entry->d_name);
+        add_file_entry(list, path);
         entry = get_next_entry(directory);
-        if (entry != NULL){ 
-            char path[PATH_SIZE];
-            concat_path(path, target, entry->d_name);
-            add_file_entry(list, path);
-        }
-    } while(entry != NULL);
+    } 
+    closedir(directory);
     return;
 }
 
