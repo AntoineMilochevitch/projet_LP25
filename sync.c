@@ -20,6 +20,7 @@
  * @param p_context is a pointer to the processes context
  */
 void synchronize(configuration_t *the_config, process_context_t *p_context) {
+
 }
 
 /*!
@@ -71,33 +72,21 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
  * @param target_path is the path whose files to list
  */
 void make_files_list(files_list_t *list, char *target_path) {
-    DIR *dir;
-    struct dirent *entry;
 
-    if ((dir = opendir(target_path)) == NULL) {
-        perror("Unable to open directory");
-        return;
-    }
+    make_list(list, target_path);
 
-    while ((entry = readdir(dir)) != NULL) {
-        char path[PATH_SIZE];
-        if (concat_path(path, target_path, entry->d_name) == NULL) {
-            perror("Unable to concatenate path");
-            continue;
-        }  
-
-        files_list_entry_t *new_entry = malloc(sizeof(files_list_entry_t));
-        if (new_entry == NULL) {
-            perror("Unable to allocate memory for new file entry");
-            continue;
+    files_list_entry_t *cursor = list->head;
+    while (cursor != NULL) {
+        DIR *dir = open_dir(cursor->path_and_name);
+        if (dir != NULL) {
+            struct dirent *entry;
+            while ((entry = get_next_entry(dir)) != NULL) {
+                get_file_stats(cursor);
+            }
+            closedir(dir);
         }
-
-        if (add_file_entry(list, path) != 0) {
-            perror("Unable to add file entry to list");
-        }
+        cursor = cursor->next;
     }
-
-    closedir(dir);
 }
 
 /*!
