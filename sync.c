@@ -10,7 +10,6 @@
 #include <sys/sendfile.h>
 #include <unistd.h>
 #include <sys/msg.h>
-
 #include <stdio.h>
 
 /*!
@@ -67,7 +66,7 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
 }
 
 /*!
- * @brief make_files_list builds a files list in no parallel mode
+ * @brief make_files_list buils a files list in no parallel mode
  * @param list is a pointer to the list that will be built
  * @param target_path is the path whose files to list
  */
@@ -128,7 +127,6 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
  * @param target is the target dir whose content must be listed
  */
 void make_list(files_list_t *list, char *target) {
-    
 }
 
 /*!
@@ -137,6 +135,8 @@ void make_list(files_list_t *list, char *target) {
  * @return a pointer to a dir, NULL if it cannot be opened
  */
 DIR *open_dir(char *path) {
+    DIR *d = opendir(path);
+    return d;
 }
 
 /*!
@@ -146,4 +146,14 @@ DIR *open_dir(char *path) {
  * Relevant entries are all regular files and dir, except . and ..
  */
 struct dirent *get_next_entry(DIR *dir) {
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            if (entry->d_type == 4 || entry->d_type == 8) {
+                return entry;
+            }
+            printf("No relevent entry found");
+        }
+    }
+    return NULL; // No relevant entry found
 }
