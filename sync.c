@@ -20,7 +20,42 @@
  * @param p_context is a pointer to the processes context
  */
 void synchronize(configuration_t *the_config, process_context_t *p_context) {
+    if (!the_config->is_parallel){
+        files_list_t *source = (files_list_t *) malloc(sizeof(files_list_t));
+        source->head = NULL;
+        source->tail = NULL;
+        make_files_list(source, the_config->source);
 
+        files_list_t *destination = (files_list_t *) malloc(sizeof(files_list_t));
+        destination->head = NULL;
+        destination->tail = NULL;
+        make_files_list(destination, the_config->destination);
+
+        files_list_t *difference = (files_list_t *) malloc(sizeof(files_list_t));
+        difference->head = NULL;
+        difference->tail = NULL;
+
+        files_list_entry_t *tmp = source->head;
+        files_list_entry_t *result;
+        while (tmp != NULL){
+            result = find_entry_by_name(destination, tmp->path_and_name, strlen(the_config->source), strlen(the_config->destination));
+            if (tmp == NULL){
+                add_entry_to_tail(difference, tmp);
+            }
+            else{
+                if (mismatch(tmp, result, true)){
+                    add_entry_to_tail(difference, tmp);
+                }
+            }
+            tmp = tmp->next;
+        }
+
+        files_list_entry_t *tmp = difference->head;
+        while (tmp != NULL){
+            add_entry_to_tail(destination, tmp);
+            tmp = tmp->next;
+        }
+    }
 }
 
 /*!
