@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/msg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /*!
  * @brief synchronize is the main function for synchronization
@@ -50,10 +51,10 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
             tmp = tmp->next;
         }
 
-        files_list_entry_t *tmp = difference->head;
-        while (tmp != NULL){
-            add_entry_to_tail(destination, tmp);
-            tmp = tmp->next;
+        files_list_entry_t *tmp_dif = difference->head;
+        while (tmp_dif != NULL){
+            add_entry_to_tail(destination, tmp_dif);
+            tmp_dif = tmp_dif->next;
         }
     }
 }
@@ -85,8 +86,8 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
         }
         char char1, char2;
 
-        while ((strcpy(char1, fgetc(file1))) != EOF && (strcpy(char2,fgetc(file2))) != EOF) {
-            if (strcmp(char1,char2) != 0) {
+        while ((char1 = fgetc(file1)) != EOF && (char2 = fgetc(file2)) != EOF) {
+            if (char1 != char2) {
                 return true;
                 break; // sort de la fonction lors de la détection d'une différence
             }
@@ -134,8 +135,10 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
-    char source[1024] = the_config->source;
-    char destination[1024] = the_config->destination;
+    char source[1024];
+    strcpy(source, the_config->source);
+    char destination[1024];
+    strcpy(source, the_config->destination);
 
     if (source_entry->entry_type == DOSSIER){
         char path[PATH_SIZE];
@@ -153,7 +156,7 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
         int fd_source, fd_destination;
         fd_source = open(source_entry->path_and_name, O_RDONLY);
         fd_destination = open(destination_file, O_WRONLY | O_CREAT | O_TRUNC, source_entry->mode);
-        sendfile(fd_destination, fd_source, offset, source_entry->size);
+        sendfile(fd_destination, fd_source, &offset, source_entry->size);
 
         close(fd_source);
         close(fd_destination);
