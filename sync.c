@@ -77,14 +77,7 @@ void make_files_list(files_list_t *list, char *target_path) {
 
     files_list_entry_t *cursor = list->head;
     while (cursor != NULL) {
-        DIR *dir = open_dir(cursor->path_and_name);
-        if (dir != NULL) {
-            struct dirent *entry;
-            while ((entry = get_next_entry(dir)) != NULL) {
-                get_file_stats(cursor);
-            }
-            closedir(dir);
-        }
+        get_file_stats(cursor); 
         cursor = cursor->next;
     }
 }
@@ -106,12 +99,12 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
-    char source[1024] = the_config->source; //test 
+    char source[1024] = the_config->source;
     char destination[1024] = the_config->destination;
 
     if (source_entry->entry_type == DOSSIER){
         char path[PATH_SIZE];
-        concat_path(path, destination, source_entry->path_and_name);
+        concat_path(path, destination, source_entry->path_and_name + strlen(the_config->source));
         mkdir(path, source_entry->mode);
     }
 
@@ -120,10 +113,10 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
         char source_file[PATH_SIZE];
         char destination_file[PATH_SIZE];
         concat_path(source_file, source, source_entry->path_and_name);
-        concat_path(destination_file, destination, source_entry->path_and_name);
+        concat_path(destination_file, destination, source_entry->path_and_name + strlen(the_config->source));
 
         int fd_source, fd_destination;
-        fd_source = open(source_file, O_RDONLY);
+        fd_source = open(source_entry->path_and_name, O_RDONLY);
         fd_destination = open(destination_file, O_WRONLY | O_CREAT | O_TRUNC, source_entry->mode);
         sendfile(fd_destination, fd_source, offset, source_entry->size);
 
@@ -147,7 +140,9 @@ void make_list(files_list_t *list, char *target) {
     }
     struct dirent *entry = get_next_entry(directory);
     while (entry != NULL){
-        add_file_entry(list, entry->d_name);
+        char full_path[PATH_SIZE];
+        concat_path(full_path, target, entry->d_name);
+        add_file_entry(list, full_path);
         entry = get_next_entry(directory);
     } 
     closedir(directory);
