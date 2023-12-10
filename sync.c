@@ -106,6 +106,31 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
+    char source[1024] = the_config->source; //test 
+    char destination[1024] = the_config->destination;
+
+    if (source_entry->entry_type == DOSSIER){
+        char path[PATH_SIZE];
+        concat_path(path, destination, source_entry->path_and_name);
+        mkdir(path, source_entry->mode);
+    }
+
+    else{
+        off_t offset = 0;
+        char source_file[PATH_SIZE];
+        char destination_file[PATH_SIZE];
+        concat_path(source_file, source, source_entry->path_and_name);
+        concat_path(destination_file, destination, source_entry->path_and_name);
+
+        int fd_source, fd_destination;
+        fd_source = open(source_file, O_RDONLY);
+        fd_destination = open(destination_file, O_WRONLY | O_CREAT | O_TRUNC, source_entry->mode);
+        sendfile(fd_destination, fd_source, offset, source_entry->size);
+
+        close(fd_source);
+        close(fd_destination);
+    }
+    return;
 }
 
 /*!
@@ -122,9 +147,7 @@ void make_list(files_list_t *list, char *target) {
     }
     struct dirent *entry = get_next_entry(directory);
     while (entry != NULL){
-        char path[PATH_SIZE];
-        concat_path(path, target, entry->d_name);
-        add_file_entry(list, path);
+        add_file_entry(list, entry->d_name);
         entry = get_next_entry(directory);
     } 
     closedir(directory);
