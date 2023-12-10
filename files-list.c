@@ -52,9 +52,7 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
         }
     }
     if (temp->next == NULL) {
-        temp->next = new_entry;
-        new_entry->prev = temp;
-        new_entry->next = NULL;
+        add_entry_to_tail(list, new_entry);
         return 0;
     }
 }
