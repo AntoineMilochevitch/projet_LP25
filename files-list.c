@@ -106,19 +106,28 @@ files_list_entry_t *find_entry_by_name(files_list_t *list, char *file_path, size
     if (list == NULL || file_path == NULL) {
         return NULL;
     }
+    char *name = strrchr(file_path + start_of_src, '/');
+    if (name != NULL)
+        name++;
+    else
+        name = file_path + start_of_src;
     files_list_entry_t* cursor = list->head;
     while (cursor != NULL) {
-        printf("\n\nComparing %s and %s\n\n", cursor->path_and_name + start_of_dest, file_path + start_of_src);
-        if (strcmp(cursor->path_and_name + start_of_dest, file_path + start_of_src) == 0) {
+        char *cursor_name = strrchr(cursor->path_and_name + start_of_dest, '/');
+        if (cursor_name != NULL)
+            cursor_name++;
+        else
+            cursor_name = cursor->path_and_name + start_of_dest;
+        printf("\n\nComparing %s and %s\n\n", cursor_name, name);
+        if (strcmp(cursor_name, name) == 0) {
             return cursor;
         }
         cursor = cursor->next;
     }
     if (cursor == NULL) {
         printf("Entry not found\n");
-        return NULL;
     }
-
+    return NULL;
 }
 
 /*!

@@ -52,19 +52,27 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
             size_t start_of_dest = strlen(the_config->destination) + 1;
             result = find_entry_by_name(destination, tmp->path_and_name, start_of_src, start_of_dest);
             printf("Result : %s\n", result ? result->path_and_name : "NULL");
+            printf("%s type : %d\n", tmp->path_and_name, tmp->entry_type);
             if (result == NULL){
                 printf("\n\nFile %s is not in destination\n\n", tmp->path_and_name);
-                add_entry_to_tail(difference, tmp);
-                if(tmp->entry_type == DOSSIER){
-                    make_files_list(difference, tmp->path_and_name);                    
-                    printf("\n\n");
-                    printf("Difference list : \n");
-                    display_files_list(difference);
+                files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
+                if (tmp_copy == NULL) {
+                    return -1;
                 }
-                if (tmp->next != NULL) {
-                    printf("Next file after adding to difference: %s\n", tmp->next->path_and_name);
-                } else {
-                    printf("Next file after adding to difference: NULL\n");
+                strncpy(tmp_copy->path_and_name, strdup(tmp->path_and_name), sizeof(tmp_copy->path_and_name));
+                tmp_copy->entry_type = tmp->entry_type;
+                tmp_copy->mode = tmp->mode;
+                tmp_copy->size = tmp->size;
+                tmp_copy->mtime = tmp->mtime;
+                tmp_copy->next = NULL;
+                for (int i = 0; i < 16; ++i) {
+                    tmp_copy->md5sum[i] = tmp->md5sum[i];
+                }
+                add_entry_to_tail(difference, tmp_copy);
+                printf("%s copy type : %d\n", tmp_copy->path_and_name, tmp_copy->entry_type);
+                tmp = tmp->next;
+                if (tmp != NULL){
+                    printf("\n\nNext file : %s\n\n", tmp->path_and_name);
                 }
             }
             else{
@@ -73,12 +81,7 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
                     printf("\n\nFile %s is different\n\n", tmp->path_and_name);
                     add_entry_to_tail(difference, tmp);
                 }
-            }
-            tmp = tmp->next;
-            if (tmp != NULL){
-                printf("\n\nNext file : %s\n\n", tmp->path_and_name);
-            } else {
-                printf("\n\nNext file : NULL\n\n");
+                tmp = tmp->next;
             }
         }
         printf("\n\n");
@@ -88,6 +91,7 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
 
         files_list_entry_t *tmp_dif = difference->head;
         while (tmp_dif != NULL){
+            printf("%s type : %d\n", tmp_dif->path_and_name, tmp_dif->entry_type);
             copy_entry_to_destination(tmp_dif, the_config);
             tmp_dif = tmp_dif->next;
         }
@@ -198,9 +202,9 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
         off_t offset = 0;
         char source_file[PATH_SIZE];
         char destination_file[PATH_SIZE];
-        printf("Copying file %s\n", source_entry->path_and_name + strlen(the_config->source));
+        printf("Copying file %s\n", source_entry->path_and_name + strlen(the_config->source) + 1);
         concat_path(source_file, source, source_entry->path_and_name);
-        concat_path(destination_file, destination, source_entry->path_and_name + strlen(the_config->source));
+        concat_path(destination_file, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
 
         int fd_source, fd_destination;
         fd_source = open(source_entry->path_and_name, O_RDONLY);
