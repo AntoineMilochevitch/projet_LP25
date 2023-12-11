@@ -102,7 +102,7 @@ int add_entry_to_tail(files_list_t *list, files_list_entry_t *entry) {
  *  @return a pointer to the element found, NULL if none were found.
  */
 files_list_entry_t *find_entry_by_name(files_list_t *list, char *file_path, size_t start_of_src, size_t start_of_dest) {
-    printf("Finding entry by name %s\n", file_path);  
+    // printf("Finding entry by name %s\n", file_path); debug
     if (list == NULL || file_path == NULL) {
         return NULL;
     }
@@ -118,15 +118,15 @@ files_list_entry_t *find_entry_by_name(files_list_t *list, char *file_path, size
             cursor_name++;
         else
             cursor_name = cursor->path_and_name + start_of_dest;
-        printf("\n\nComparing %s and %s\n\n", cursor_name, name);
+        // printf("\n\nComparing %s and %s\n\n", cursor_name, name); debug
         if (strcmp(cursor_name, name) == 0) {
             return cursor;
         }
         cursor = cursor->next;
     }
-    if (cursor == NULL) {
+    /*if (cursor == NULL) {
         printf("Entry not found\n");
-    }
+    }*/ // debug
     return NULL;
 }
 
