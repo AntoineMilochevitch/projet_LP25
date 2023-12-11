@@ -27,8 +27,9 @@
  * @return -1 in case of error, 0 else
  */
 int get_file_stats(files_list_entry_t *entry) {
+    // printf("Getting stats for %s\n", entry->path_and_name); debug
     struct stat sb;
-    char path = entry->path_and_name;
+    char *path = entry->path_and_name;
     if (lstat(path, &sb) == -1) {
         return -1;
     }
@@ -59,7 +60,7 @@ int get_file_stats(files_list_entry_t *entry) {
  * Use libcrypto functions from openssl/evp.h
  */
 int compute_file_md5(files_list_entry_t *entry) {
-
+    // printf("Computing MD5 for %s\n", entry->path_and_name); debug
     //Ouvre et vérifie si le fichier à été correctement ouvert.
     FILE *file = fopen(entry->path_and_name, "rb");
     if (!file) {
@@ -82,7 +83,7 @@ int compute_file_md5(files_list_entry_t *entry) {
     size_t bytes;
     while ((bytes = fread(buffer, 1, sizeof(buffer), file)) != 0) {
         if (1 != EVP_DigestUpdate(mdctx, buffer, bytes)) {
-            printf("%s\n", mdctx);
+            printf("%p\n", mdctx);
             fclose(file);
             EVP_MD_CTX_free(mdctx);
             perror("Erreur dans la mise à jour de la somme MD5");

@@ -21,16 +21,24 @@
  * @param p_context is a pointer to the processes context
  */
 void synchronize(configuration_t *the_config, process_context_t *p_context) {
+    printf("Synchronizing %s and %s\n", the_config->source, the_config->destination);
     if (!the_config->is_parallel){
         files_list_t *source = (files_list_t *) malloc(sizeof(files_list_t));
         source->head = NULL;
         source->tail = NULL;
         make_files_list(source, the_config->source);
-
+        printf("\n\n");
+        printf("Source list : \n");
+        display_files_list(source);
+        printf("\n\n");
         files_list_t *destination = (files_list_t *) malloc(sizeof(files_list_t));
         destination->head = NULL;
         destination->tail = NULL;
         make_files_list(destination, the_config->destination);
+        printf("\n\n");
+        printf("Destination list : \n");
+        display_files_list(destination);
+        printf("\n\n");
 
         files_list_t *difference = (files_list_t *) malloc(sizeof(files_list_t));
         difference->head = NULL;
@@ -39,21 +47,48 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
         files_list_entry_t *tmp = source->head;
         files_list_entry_t *result;
         while (tmp != NULL){
-            result = find_entry_by_name(destination, tmp->path_and_name, strlen(the_config->source), strlen(the_config->destination));
-            if (tmp == NULL){
+            printf("Comparing %s\n", tmp->path_and_name);
+            size_t start_of_src = strlen(the_config->source) + 1;
+            size_t start_of_dest = strlen(the_config->destination) + 1;
+            result = find_entry_by_name(destination, tmp->path_and_name, start_of_src, start_of_dest);
+            printf("Result : %s\n", result ? result->path_and_name : "NULL");
+            if (result == NULL){
+                printf("\n\nFile %s is not in destination\n\n", tmp->path_and_name);
                 add_entry_to_tail(difference, tmp);
+                if(tmp->entry_type == DOSSIER){
+                    make_files_list(difference, tmp->path_and_name);                    
+                    printf("\n\n");
+                    printf("Difference list : \n");
+                    display_files_list(difference);
+                }
+                if (tmp->next != NULL) {
+                    printf("Next file after adding to difference: %s\n", tmp->next->path_and_name);
+                } else {
+                    printf("Next file after adding to difference: NULL\n");
+                }
             }
             else{
+                printf("\n\nFile %s is in destination\n\n", tmp->path_and_name);
                 if (mismatch(tmp, result, true)){
+                    printf("\n\nFile %s is different\n\n", tmp->path_and_name);
                     add_entry_to_tail(difference, tmp);
                 }
             }
             tmp = tmp->next;
+            if (tmp != NULL){
+                printf("\n\nNext file : %s\n\n", tmp->path_and_name);
+            } else {
+                printf("\n\nNext file : NULL\n\n");
+            }
         }
+        printf("\n\n");
+        printf("Difference list : \n");
+        display_files_list(difference);
+        printf("\n\n");
 
         files_list_entry_t *tmp_dif = difference->head;
         while (tmp_dif != NULL){
-            add_entry_to_tail(destination, tmp_dif);
+            copy_entry_to_destination(tmp_dif, the_config);
             tmp_dif = tmp_dif->next;
         }
     }
@@ -67,8 +102,17 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
  * @return true if both files are not equal, false else
  */
 bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
+    printf("Comparing %s and %s\n", lhd->path_and_name, rhd->path_and_name);
     // Ici, EOF = end of file, caractèr marquant la fin d'un fichier
+    if (lhd == NULL || rhd == NULL || lhd->path_and_name == NULL || rhd->path_and_name == NULL) {
+        fprintf(stderr, "Invalid arguments to mismatch\n");
+        exit(-1);
+    }
     if (has_md5) {
+        if (lhd->md5sum == NULL || rhd->md5sum == NULL) {
+            fprintf(stderr, "MD5 sum not available\n");
+            exit(-1);
+        }
         for (int i = 0; i < 16; ++i) {
             if (lhd->md5sum[i] != rhd->md5sum[i]) {
                 return true;
@@ -108,7 +152,7 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
  * @param target_path is the path whose files to list
  */
 void make_files_list(files_list_t *list, char *target_path) {
-
+    printf("Making files list for %s\n", target_path);
     make_list(list, target_path);
 
     files_list_entry_t *cursor = list->head;
@@ -135,14 +179,18 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
+    printf("Copying %s to %s\n", source_entry->path_and_name, the_config->destination);
     char source[1024];
     strcpy(source, the_config->source);
     char destination[1024];
-    strcpy(source, the_config->destination);
+    strcpy(destination, the_config->destination);
+    // printf("Source : %s\n", source); debug
+    // printf("Destination : %s\n", destination); debug
 
     if (source_entry->entry_type == DOSSIER){
         char path[PATH_SIZE];
-        concat_path(path, destination, source_entry->path_and_name + strlen(the_config->source));
+        printf("Creating directory %s\n", source_entry->path_and_name + strlen(the_config->source) + 1);
+        concat_path(path, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
         mkdir(path, source_entry->mode);
     }
 
@@ -150,6 +198,7 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
         off_t offset = 0;
         char source_file[PATH_SIZE];
         char destination_file[PATH_SIZE];
+        printf("Copying file %s\n", source_entry->path_and_name + strlen(the_config->source));
         concat_path(source_file, source, source_entry->path_and_name);
         concat_path(destination_file, destination, source_entry->path_and_name + strlen(the_config->source));
 
@@ -172,19 +221,23 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
  * @param target is the target dir whose content must be listed
  */
 void make_list(files_list_t *list, char *target) {
-    DIR *directory = open_dir(target);
-    if (directory == NULL){
+    DIR *dir;
+    if (!(dir = open_dir(target)))
         return;
-    }
-    struct dirent *entry = get_next_entry(directory);
-    while (entry != NULL){
+
+    struct dirent *entry;
+    while ((entry = get_next_entry(dir)) != NULL) {
         char full_path[PATH_SIZE];
         concat_path(full_path, target, entry->d_name);
-        add_file_entry(list, full_path);
-        entry = get_next_entry(directory);
-    } 
-    closedir(directory);
-    return;
+
+        if (entry->d_type == DT_DIR) {
+            add_file_entry(list, full_path);
+            make_list(list, full_path);
+        } else {
+            add_file_entry(list, full_path);
+        }
+    }
+    closedir(dir);
 }
 
 /*!
@@ -204,6 +257,7 @@ DIR *open_dir(char *path) {
  * Relevant entries are all regular files and dir, except . and ..
  */
 struct dirent *get_next_entry(DIR *dir) {
+    // printf("Getting next entry\n"); debug
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {

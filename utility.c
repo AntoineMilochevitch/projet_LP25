@@ -1,5 +1,6 @@
 #include "defines.h"
 #include <string.h>
+#include <stdio.h>
 
 /*!
  * @brief concat_path concatenates suffix to prefix into result
@@ -11,6 +12,7 @@
  * @return a pointer to the resulting path, NULL when concatenation failed
  */
 char *concat_path(char *result, char *prefix, char *suffix) {
+    // printf("Concatenating %s and %s\n", prefix, suffix); debug
     if (prefix == NULL || suffix == NULL) {
         return NULL;
     }

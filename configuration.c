@@ -43,6 +43,7 @@ void init_configuration(configuration_t *the_config) {
  * @return -1 if configuration cannot succeed, 0 when ok
  */
 int set_configuration(configuration_t *the_config, int argc, char *argv[]) {
+    printf("Setting configuration\n");
     int opt;
     struct option long_options[] = {
         {"date-size-only", no_argument,       0, 'd'},
