@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 /*!
  * @brief synchronize is the main function for synchronization
  * It will build the lists (source and destination), then make a third list with differences, and apply differences to the destination
@@ -23,83 +24,59 @@
 void synchronize(configuration_t *the_config, process_context_t *p_context) {
     printf("Synchronizing %s and %s\n", the_config->source, the_config->destination);
     if (!the_config->is_parallel){
-        files_list_t *source = (files_list_t *) malloc(sizeof(files_list_t));
-        source->head = NULL;
-        source->tail = NULL;
-        make_files_list(source, the_config->source);
-        //debug
-        /*printf("\n\n");
-        printf("Source list : \n");
-        display_files_list(source);
-        printf("\n\n"); */
-        files_list_t *destination = (files_list_t *) malloc(sizeof(files_list_t));
-        destination->head = NULL;
-        destination->tail = NULL;
-        make_files_list(destination, the_config->destination);
-        //debug
-        /*printf("\n\n");
-        printf("Destination list : \n");
-        display_files_list(destination);
-        printf("\n\n");*/ 
+        files_list_t source = {NULL, NULL};
+        make_files_list(&source, the_config->source);
 
-        files_list_t *difference = (files_list_t *) malloc(sizeof(files_list_t));
-        difference->head = NULL;
-        difference->tail = NULL;
+        files_list_t destination = {NULL, NULL};
+        make_files_list(&destination, the_config->destination);
 
-        files_list_entry_t *tmp = source->head;
+        files_list_t difference = {NULL, NULL};
+
+        files_list_entry_t *tmp = source.head;
         files_list_entry_t *result;
         while (tmp != NULL){
-            // printf("Comparing %s\n", tmp->path_and_name); debug
             size_t start_of_src = strlen(the_config->source) + 1;
             size_t start_of_dest = strlen(the_config->destination) + 1;
-            result = find_entry_by_name(destination, tmp->path_and_name, start_of_src, start_of_dest);
-            // printf("Result : %s\n", result ? result->path_and_name : "NULL"); debug
-            // printf("%s type : %d\n", tmp->path_and_name, tmp->entry_type); debug
+            result = find_entry_by_name(&destination, tmp->path_and_name, start_of_src, start_of_dest);
             if (result == NULL){
-                // printf("\n\nFile %s is not in destination\n\n", tmp->path_and_name); debug
-                files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
-                if (tmp_copy == NULL) {
-                    return -1;
-                }
-                strncpy(tmp_copy->path_and_name, strdup(tmp->path_and_name), sizeof(tmp_copy->path_and_name));
-                tmp_copy->entry_type = tmp->entry_type;
-                tmp_copy->mode = tmp->mode;
-                tmp_copy->size = tmp->size;
-                tmp_copy->mtime = tmp->mtime;
-                tmp_copy->next = NULL;
-                for (int i = 0; i < 16; ++i) {
-                    tmp_copy->md5sum[i] = tmp->md5sum[i];
-                }
-                add_entry_to_tail(difference, tmp_copy);
-                // printf("%s copy type : %d\n", tmp_copy->path_and_name, tmp_copy->entry_type); debug
-                tmp = tmp->next;
-                // debug
-                /*if (tmp != NULL){
-                    printf("\n\nNext file : %s\n\n", tmp->path_and_name);
-                }*/
+                files_list_entry_t tmp_copy;
+                memcpy(&tmp_copy, tmp, sizeof(files_list_entry_t));
+                add_entry_to_tail(&difference, &tmp_copy);
             }
             else{
-                // printf("\n\nFile %s is in destination\n\n", tmp->path_and_name); debug
-                if (mismatch(tmp, result, true)){
-                    // printf("\n\nFile %s is different\n\n", tmp->path_and_name); debug
-                    add_entry_to_tail(difference, tmp);
+                if (mismatch(tmp, result, true)) {
+                    add_entry_to_tail(&difference, tmp);
                 }
-                tmp = tmp->next;
             }
+            tmp = tmp->next;
         }
-        // debug
-        /*printf("\n\n");
-        printf("Difference list : \n");
-        display_files_list(difference);
-        printf("\n\n");*/
 
-        files_list_entry_t *tmp_dif = difference->head;
-        while (tmp_dif != NULL){
-            // printf("%s type : %d\n", tmp_dif->path_and_name, tmp_dif->entry_type); debug
-            copy_entry_to_destination(tmp_dif, the_config);
-            tmp_dif = tmp_dif->next;
-        }
+        tmp = destination.head;
+        while (tmp != NULL) {
+            copy_entry_to_destination(tmp, the_config);
+            tmp = tmp->next;   
+        }  
+
+        free_files_list(&source);
+        free_files_list(&destination);
+        free_files_list(&difference);
     }
+}
+
+
+/*!
+ * @brief free_files_list frees the memory allocated for a files list
+ * @param list is a pointer to the list to be freed
+ */
+void free_files_list(files_list_t *list) {
+    files_list_entry_t *tmp = list->head;
+    while (tmp != NULL) {
+        files_list_entry_t *next = tmp->next;
+        free(tmp);
+        tmp = next;
+    }
+    list->head = NULL;
+    list->tail = NULL;
 }
 
 /*!
@@ -116,6 +93,14 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
         fprintf(stderr, "Invalid arguments to mismatch\n");
         exit(-1);
     }
+
+    if (lhd->size != rhd->size) {
+        return true;
+    }
+
+    if (lhd->mtime.tv_nsec != rhd->mtime.tv_nsec || lhd->mtime.tv_sec != rhd->mtime.tv_sec) {
+        return true;
+    }
     if (has_md5) {
         if (lhd->md5sum == NULL || rhd->md5sum == NULL) {
             fprintf(stderr, "MD5 sum not available\n");
@@ -126,31 +111,7 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
                 return true;
             }
         }
-    } else {
-        FILE *file1 = fopen(lhd->path_and_name, "rb");
-        FILE *file2 = fopen(rhd->path_and_name, "rb");
-
-        if (file1 == NULL || file2 == NULL) {
-            if (file1) fclose(file1);
-            if (file2) fclose(file2);
-            fprintf(stderr, "[MISMATCH TEST] : un des 2 fichier n'a pas pu être ouvert\n");
-            exit(-1);
-        }
-        char char1, char2;
-
-        while ((char1 = fgetc(file1)) != EOF && (char2 = fgetc(file2)) != EOF) {
-            if (char1 != char2) {
-                return true;
-                break; // sort de la fonction lors de la détection d'une différence
-            }
-        }
-        // Si la longueur des fichiers est différente
-        if ((char1 == EOF && char2 != EOF) || (char1 != EOF && char2 == EOF)) {
-            return true;
-        }
-        fclose(file1);
-        fclose(file2);
-    }
+    } 
     return false;
 }
 
@@ -161,6 +122,10 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
  */
 void make_files_list(files_list_t *list, char *target_path) {
     // printf("Making files list for %s\n", target_path); debug
+    if (list == NULL || target_path == NULL) {
+        fprintf(stderr, "Invalid arguments to make_files_list\n");
+        exit(-1);
+    }
     make_list(list, target_path);
 
     files_list_entry_t *cursor = list->head;
@@ -188,6 +153,10 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
     // printf("Copying %s to %s\n", source_entry->path_and_name, the_config->destination); debug
+    if (source_entry == NULL || the_config == NULL) {
+        fprintf(stderr, "Invalid arguments to copy_entry_to_destination\n");
+        exit(-1);
+    }
     char source[1024];
     strcpy(source, the_config->source);
     char destination[1024];
@@ -229,6 +198,10 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
  * @param target is the target dir whose content must be listed
  */
 void make_list(files_list_t *list, char *target) {
+    if (list == NULL || target == NULL) {
+        fprintf(stderr, "Invalid arguments to make_list\n");
+        exit(-1);
+    }
     DIR *dir;
     if (!(dir = open_dir(target)))
         return;
@@ -255,6 +228,9 @@ void make_list(files_list_t *list, char *target) {
  */
 DIR *open_dir(char *path) {
     DIR *d = opendir(path);
+    if (d == NULL) {
+        perror("Failed to open directory");
+    }
     return d;
 }
 
@@ -269,7 +245,7 @@ struct dirent *get_next_entry(DIR *dir) {
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-            if (entry->d_type == 4 || entry->d_type == 8) {
+            if (entry->d_type == DT_DIR || entry->d_type == DT_REG) {
                 return entry;
             }
             printf("No relevent entry found");

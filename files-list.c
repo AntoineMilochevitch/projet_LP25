@@ -39,7 +39,7 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
     if (list->head == NULL) {
         list->head = new_entry;
         // printf("File added\n"); debug
-        return 0;
+        return new_entry;
     }
 
     files_list_entry_t *temp = list->head;
@@ -47,7 +47,7 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
         if (strcmp(temp->path_and_name, file_path) == 0) {
             // printf("File already exists\n"); debug
             free(new_entry);
-            return 0;
+            return NULL;
         } else {
             if (temp->next == NULL || strcmp(temp->next->path_and_name, file_path) > 0) {
                 new_entry->next = temp->next;
@@ -57,13 +57,11 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
                 }
                 temp->next = new_entry;
                 // debug printf("File added\n");
-                return 0;
+                return new_entry;
             }
         }
         temp = temp->next;
     }
-
-    return 0;
 }
 
 
@@ -76,6 +74,10 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
  * @return 0 in case of success, -1 else
  */
 int add_entry_to_tail(files_list_t *list, files_list_entry_t *entry) {
+    if (list == NULL) {
+        printf("List is NULL\n");
+        return -1;
+    }
     if (entry == NULL) {
         printf("Entry is NULL\n");
         return -1;
@@ -102,31 +104,21 @@ int add_entry_to_tail(files_list_t *list, files_list_entry_t *entry) {
  *  @return a pointer to the element found, NULL if none were found.
  */
 files_list_entry_t *find_entry_by_name(files_list_t *list, char *file_path, size_t start_of_src, size_t start_of_dest) {
-    // printf("Finding entry by name %s\n", file_path); debug
     if (list == NULL || file_path == NULL) {
         return NULL;
     }
-    char *name = strrchr(file_path + start_of_src, '/');
-    if (name != NULL)
-        name++;
-    else
-        name = file_path + start_of_src;
+    char *name = file_path + start_of_src;
     files_list_entry_t* cursor = list->head;
     while (cursor != NULL) {
-        char *cursor_name = strrchr(cursor->path_and_name + start_of_dest, '/');
-        if (cursor_name != NULL)
-            cursor_name++;
-        else
-            cursor_name = cursor->path_and_name + start_of_dest;
-        // printf("\n\nComparing %s and %s\n\n", cursor_name, name); debug
-        if (strcmp(cursor_name, name) == 0) {
+        char *cursor_name = cursor->path_and_name + start_of_dest;
+        int cmp = strcmp(cursor_name, name);
+        if (cmp == 0) {
             return cursor;
+        } else if (cmp > 0) {
+            break;
         }
         cursor = cursor->next;
     }
-    /*if (cursor == NULL) {
-        printf("Entry not found\n");
-    }*/ // debug
     return NULL;
 }
 

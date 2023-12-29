@@ -33,7 +33,8 @@ int get_file_stats(files_list_entry_t *entry) {
     if (lstat(path, &sb) == -1) {
         return -1;
     }
-
+    
+    entry->mtime.tv_sec = sb.st_mtime;
     entry->mtime.tv_nsec = sb.st_mtime;
     entry->size = sb.st_size;
     entry->mode = sb.st_mode;
@@ -62,6 +63,10 @@ int get_file_stats(files_list_entry_t *entry) {
 int compute_file_md5(files_list_entry_t *entry) {
     // printf("Computing MD5 for %s\n", entry->path_and_name); debug
     //Ouvre et vérifie si le fichier à été correctement ouvert.
+    if (entry == NULL) {
+        printf("Le paramètre 'entry' est NULL.\n");
+        return -1;
+    }
     FILE *file = fopen(entry->path_and_name, "rb");
     if (!file) {
         perror("Impossible d'ouvrir le fichier");
@@ -110,6 +115,9 @@ int compute_file_md5(files_list_entry_t *entry) {
  * @return true if directory exists, false else
  */
 bool directory_exists(char *path_to_dir) {
+    if (path_to_dir == NULL) {
+        return false;
+    }
     struct stat sb;
     if (stat(path_to_dir, &sb) == 0 && S_ISDIR(sb.st_mode)) {
         return true;

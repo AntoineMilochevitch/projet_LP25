@@ -33,6 +33,8 @@ void init_configuration(configuration_t *the_config) {
     the_config->processes_count = 1;
     the_config->is_parallel = true;
     the_config->uses_md5 = true;
+    the_config->verbose = false;
+    the_config->dry_run = false;
 }
 
 /*!
@@ -50,7 +52,6 @@ int set_configuration(configuration_t *the_config, int argc, char *argv[]) {
         {"no-parallel",    no_argument,       0, 'p'},
         {"dry-run",        no_argument,       0, 'r'},
         {"verbose",        no_argument,       0, 'v'},
-        {"n",              required_argument, 0, 'n'},
         {0, 0, 0, 0}
     };
 
