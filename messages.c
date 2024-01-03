@@ -19,7 +19,8 @@ int send_file_entry(int msg_queue, int recipient, files_list_entry_t *file_entry
     message.op_code = cmd_code;
     memcpy(&message.payload, file_entry, sizeof(files_list_entry_t));
 
-    return msgsnd(msg_queue, &message, sizeof(files_list_entry_transmit_t) - sizeof(long), 0);
+    size_t message_size = sizeof(message) - sizeof(long);
+    return msgsnd(msg_queue, &message, message_size, 0);
 }
 
 /*!
@@ -30,6 +31,13 @@ int send_file_entry(int msg_queue, int recipient, files_list_entry_t *file_entry
  * @return the result of msgsnd
  */
 int send_analyze_dir_command(int msg_queue, int recipient, char *target_dir) {
+    analyze_dir_command_t message;
+    message.mtype = recipient;
+    message.op_code = COMMAND_CODE_ANALYZE_DIR;
+    strncpy(message.target, target_dir, sizeof(PATH_SIZE) - 1);
+
+    size_t message_size = sizeof(message) - sizeof(long);
+    return msgsnd(msg_queue, &message, message_size, 0);
 }
 
 // The 3 following functions are one-liners
@@ -78,6 +86,7 @@ int send_files_list_element(int msg_queue, int recipient, files_list_entry_t *fi
  */
 int send_list_end(int msg_queue, int recipient) {
     
+    //return msgsnd(msg_queue, &message, message_size, 0);
 }
 
 /*!
