@@ -49,8 +49,40 @@ void analyzer_process_loop(void *parameters) {
  */
 void clean_processes(configuration_t *the_config, process_context_t *p_context) {
     // Do nothing if not parallel
-    // Send terminate
-    // Wait for responses
-    // Free allocated memory
-    // Free the MQ
+    if (the_config->is_parallel){
+        int loop_dl = 1;
+        int loop_sl = 1;
+        int loop_da = 1;
+        int loop_sa = 1;
+        simple_command_t message_end;
+
+        // Send terminate
+        send_terminate_command(p_context->message_queue_id, MSG_TYPE_TO_DESTINATION_LISTER); 
+        send_terminate_command(p_context->message_queue_id, MSG_TYPE_TO_SOURCE_LISTER);
+        send_terminate_command(p_context->message_queue_id, MSG_TYPE_TO_DESTINATION_ANALYZERS);
+        send_terminate_command(p_context->message_queue_id, MSG_TYPE_TO_SOURCE_ANALYZERS);
+
+        // Wait for responses
+        while (loop_dl && loop_sl && loop_sa && loop_da){ 
+            if (msgrcv(p_context->message_queue_id, &message_end, sizeof(message_end.message), MSG_TYPE_TO_DESTINATION_LISTER, 0) != -1){ 
+                loop_dl = 0;
+            }
+            if (msgrcv(p_context->message_queue_id, &message_end, sizeof(message_end.message), MSG_TYPE_TO_SOURCE_LISTER, 0) != -1){ 
+                loop_sl = 0;
+            }
+            if (msgrcv(p_context->message_queue_id, &message_end, sizeof(message_end.message), MSG_TYPE_TO_DESTINATION_ANALYZERS, 0) != -1){ 
+                loop_da = 0;
+            }
+            if (msgrcv(p_context->message_queue_id, &message_end, sizeof(message_end.message), MSG_TYPE_TO_SOURCE_ANALYZERS, 0) != -1){ 
+                loop_sa = 0;
+            }
+        }
+
+        // Free allocated memory 
+        free(p_context->source_analyzers_pids);
+        free(p_context->destination_analyzers_pids);
+
+        // Free the MQ
+        msgctl(p_context->message_queue_id, IPC_RMID, NULL);
+    }
 }
