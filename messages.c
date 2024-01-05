@@ -85,6 +85,12 @@ int send_files_list_element(int msg_queue, int recipient, files_list_entry_t *fi
  * @return the result of msgsnd
  */
 int send_list_end(int msg_queue, int recipient) {
+    simple_command_t message;
+    message.mtype = recipient;
+    message.message = COMMAND_CODE_LIST_COMPLETE;
+
+    size_t message_size = sizeof(message) - sizeof(long);
+    return msgsnd(msg_queue, &message, message_size, 0);
 }
 
 /*!
