@@ -49,14 +49,39 @@ int make_process(process_context_t *p_context, process_loop_t func, void *parame
  * @brief lister_process_loop is the lister process function (@see make_process)
  * @param parameters is a pointer to its parameters, to be cast to a lister_configuration_t
  */
-void lister_process_loop(void *parameters) {
+void lister_process_loop(lister_configuration_t *parameters) {
+    //msgget(parameters->mq_key, 0666 | IPC_CREAT)
+    //ne pas oublier de fermer les files de messages
 }
 
 /*!
  * @brief analyzer_process_loop is the analyzer process function
  * @param parameters is a pointer to its parameters, to be cast to an analyzer_configuration_t
  */
-void analyzer_process_loop(void *parameters) {
+void analyzer_process_loop(analyzer_configuration_t *parameters) {
+    files_list_entry_transmit_t message;
+    simple_command_t message_end;
+    int msg_id = msgget(parameters->mq_key, 0666);
+    int loop = 1;
+    while (loop){
+        if (msgrcv(msg_id, &message, sizeof(message) - sizeof(long), parameters->my_receiver_id, 0) != -1){
+            if (message.op_code == COMMAND_CODE_ANALYZE_DIR){
+                get_file_stats(&message.payload);
+            }
+            if (message.op_code == COMMAND_CODE_ANALYZE_FILE){
+                get_file_stats(&message.payload);
+                if (parameters->use_md5){
+                    compute_file_md5(&message.payload);
+                }
+            }
+            send_analyze_file_response(msg_id, parameters->my_recipient_id, &message.payload);
+        }
+        if (msgrcv(, &message_end, sizeof(message_end.message, MSG_TYPE_TO_DESTINATION_ANALYZERS, 0)) != -1){ // je sais pas quoi mettre dans le premier et le 4 destination ou source ?
+            if (message_end.message == COMMAND_CODE_TERMINATE){
+                loop = 0;
+            }
+        }
+    }
 }
 
 /*!
