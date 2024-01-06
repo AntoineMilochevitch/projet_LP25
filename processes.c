@@ -16,13 +16,49 @@
  * @return 0 if all went good, -1 else
  */
 int prepare(configuration_t *the_config, process_context_t *p_context) {
-    if (the_config->is_parallel){
+    //The goal here is to modify p_context in order to use it in the synchronize function
+    //If the parallel is disabled, the process context is unecessary
+
+    //Process count 
+    p_context->processes_count = the_config->processes_count;
+
+    if (!the_config->is_parallel){
         printf("La configuration parallèle est désactivée.\n");
         return 0;
-    }
-    else{
+    } else {
+        //Create lister for both dest & src 
+        lister_configuration_t *lister_config_dest, *lister_config_src; 
+        p_context->source_lister_pid = make_process(p_context, lister_process_loop, lister_config_src);
+        p_context->destination_lister_pid = make_process(p_context, lister_process_loop, lister_config_dest);
+        if (p_context->source_lister_pid == -1 || p_context->destination_lister_pid == -1) { // PID -1 = FAIL
+            return -1;
+        }
 
+        // Create analyzer processes
+        p_context->source_analyzers_pids = malloc(sizeof(pid_t) * the_config->processes_count);
+        p_context->destination_analyzers_pids = malloc(sizeof(pid_t) * the_config->processes_count);
+        for(int i = 0; i < the_config->processes_count; i++){
+            analyzer_configuration_t *analyser_config_dest, *analyser_config_src; 
+            p_context->source_analyzers_pids[i] = make_process(p_context, analyzer_process_loop, analyser_config_src);
+            p_context->destination_analyzers_pids[i] = make_process(p_context, analyzer_process_loop, analyser_config_dest); 
+            if(p_context->destination_analyzers_pids[i] == -1 || p_context->source_analyzers_pids[i] == -1){
+                //Terminate both listers process
+                kill(p_context->source_lister_pid, 0);
+                kill(p_context->destination_lister_pid, 0);
+                return -1;
+            }
+        }
+
+        /* Ta fait quoi ici Mathis ?
+        // Wait for both processes to initialize
+        if (wait_for_processes(p_context) == -1) {
+            // Terminate lister and analyzer processes
+            kill(p_context->source_lister_pid, p_context);
+            kill(p_context->source_analyzers_pids, p_context);
+            return -1; // Failed to wait for processes
+        }*/
     }
+    return 0;
 }
 
 /*!
@@ -50,8 +86,29 @@ int make_process(process_context_t *p_context, process_loop_t func, void *parame
  * @param parameters is a pointer to its parameters, to be cast to a lister_configuration_t
  */
 void lister_process_loop(lister_configuration_t *parameters) {
-    //msgget(parameters->mq_key, 0666 | IPC_CREAT)
+    int msg_q_id = msgget(parameters->mq_key, 0666 | IPC_CREAT);
+    //je crois qu'il faut faire ça : 
+    /*
+    - récupérer noms des fichiers via les messages ?
+    - les mettre dans une liste avec les commandes file-list.c ?
+    - Envoyer le tout à l'analyser_process_loop via message ?
+    - Une fois tout ça finit l'envoyer au main ?
+    */
     //ne pas oublier de fermer les files de messages
+    files_list_entry_transmit_t message; 
+    //Send message to analyser via MQ ??
+    msgsnd(msg_q_id, &message, sizeof(message) - sizeof(long), 0);
+    
+
+    //Create file list
+    files_list_t l;
+    l.head = NULL; 
+    l.tail = NULL;
+
+
+
+
+    //Once the list is created, send it to 
 }
 
 /*!
@@ -76,7 +133,7 @@ void analyzer_process_loop(analyzer_configuration_t *parameters) {
             }
             send_analyze_file_response(msg_id, parameters->my_recipient_id, &message.payload);
         }
-        if (msgrcv(, &message_end, sizeof(message_end.message, MSG_TYPE_TO_DESTINATION_ANALYZERS, 0)) != -1){ // je sais pas quoi mettre dans le premier et le 4 destination ou source ?
+        if (msgrcv(, &message_end, sizeof(message_end.message), MSG_TYPE_TO_SOURCE_ANALYZERS, 0) != -1){ // je sais pas quoi mettre dans le premier et le 4 destination ou source ?
             if (message_end.message == COMMAND_CODE_TERMINATE){
                 loop = 0;
             }
