@@ -21,8 +21,28 @@ int prepare(configuration_t *the_config, process_context_t *p_context) {
         return 0;
     }
     else{
+        //Create Lister
+        p_context->source_lister_pid = make_process(p_context, lister_process_loop, &the_config->processes_count);
+        if (p_context->source_lister_pid == -1) { // PID -1 = FAIL
+            return -1;
+        }
+        // Create analyzer process
+        p_context->source_analyzers_pids = make_process(p_context, analyzer_process_loop, &the_config->processes_count);
+        if (p_context->source_analyzers_pids == -1) {
+            // Terminate lister process
+            kill(p_context->source_lister_pid, p_context);
+            return -1; // Failed to create analyzer process, kill the lister too
+        }
 
+        // Wait for both processes to initialize
+        if (wait_for_processes(p_context) == -1) {
+            // Terminate lister and analyzer processes
+            kill(p_context->source_lister_pid, p_context);
+            kill(p_context->source_analyzers_pids, p_context);
+            return -1; // Failed to wait for processes
+        }
     }
+    return 0;
 }
 
 /*!
