@@ -35,7 +35,7 @@ typedef void (*process_loop_t)(void *);
 
 int prepare(configuration_t *the_config, process_context_t *p_context);
 int make_process(process_context_t *p_context, process_loop_t func, void *parameters);
-void lister_process_loop(void *parameters);
-void analyzer_process_loop(void *parameters);
+void lister_process_loop(lister_configuration_t *parameters);
+void analyzer_process_loop(analyzer_configuration_t *parameters);
 void clean_processes(configuration_t *the_config, process_context_t *p_context);
 void request_element_details(int msg_queue, files_list_entry_t *entry, lister_configuration_t *cfg, int *current_analyzers);
