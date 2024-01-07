@@ -107,12 +107,7 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
             }
             tmp_dif = tmp_dif->next;   
         } 
-        files_list_entry_t *current = difference.head;
-        while (current != NULL) {
-            files_list_entry_t *next = current->next;
-            free(current);  // This frees the memory allocated for tmp_copy
-            current = next;
-        }
+        clear_files_list(&difference);
     } /*else {
         files_list_t dest_l, src_l, diff_l; 
         //Parallel enabled so goes into an infinite loop until receiving stop message from both listers
@@ -197,7 +192,7 @@ void make_files_list(files_list_t *list, char *target_path) {
  * @param msg_queue is the id of the MQ used for communication
  */
 void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, configuration_t *the_config, int msg_queue) {
-
+    
 }
 
 /*!
