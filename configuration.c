@@ -64,10 +64,10 @@ int set_configuration(configuration_t *the_config, int argc, char *argv[]) {
                 the_config->is_parallel = false;
                 break;
             case 'r':
-                // handle dry-run option
+                the_config->dry_run = true;
                 break;
             case 'v':
-                // handle verbose option
+                the_config->verbose = true;
                 break;
             case 'n':
                 the_config->processes_count = atoi(optarg);

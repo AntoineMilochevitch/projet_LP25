@@ -7,7 +7,6 @@
 #include <dirent.h>
 
 void synchronize(configuration_t *the_config, process_context_t *p_context);
-void free_files_list(files_list_t *list);
 void make_files_list(files_list_t *list, char *target_path);
 bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5);
 void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, configuration_t *the_config, int msg_queue);

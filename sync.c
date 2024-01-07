@@ -22,13 +22,29 @@
  * @param p_context is a pointer to the processes context
  */
 void synchronize(configuration_t *the_config, process_context_t *p_context) {
-    printf("Synchronizing %s and %s\n", the_config->source, the_config->destination);
-    if (!the_config->is_parallel){
+    if (p_context == NULL) {
+        fprintf(stderr, "Invalid arguments to synchronize\n");
+        exit(-1);
+    }
+    if (the_config->verbose || the_config->dry_run) {
+        printf("Synchronizing %s and %s\n", the_config->source, the_config->destination);
+    }
+    if (!the_config->is_parallel) {
         files_list_t source = {NULL, NULL};
         make_files_list(&source, the_config->source);
 
+        if (the_config->verbose || the_config->dry_run) {
+            printf("\nSource files:\n");
+            display_files_list(&source);
+        }
+
         files_list_t destination = {NULL, NULL};
         make_files_list(&destination, the_config->destination);
+
+        if (the_config->verbose || the_config->dry_run) {
+            printf("\nDestination files:\n");
+            display_files_list(&destination);
+        }  
 
         files_list_t difference = {NULL, NULL};
 
@@ -37,30 +53,67 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
         while (tmp != NULL){
             size_t start_of_src = strlen(the_config->source) + 1;
             size_t start_of_dest = strlen(the_config->destination) + 1;
+            if (the_config->verbose || the_config->dry_run) {
+                printf("\nComparing %s and %s\n", tmp->path_and_name, destination.head->path_and_name);
+            }
             result = find_entry_by_name(&destination, tmp->path_and_name, start_of_src, start_of_dest);
             if (result == NULL){
-                files_list_entry_t tmp_copy;
-                memcpy(&tmp_copy, tmp, sizeof(files_list_entry_t));
-                add_entry_to_tail(&difference, &tmp_copy);
+                if (the_config->verbose || the_config->dry_run) {
+                    printf("\nDifferent, adding %s to the list of files to copy\n", tmp->path_and_name + start_of_src);
+                }
+                files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
+                if (tmp_copy == NULL) {
+                    fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
+                    exit(-1);
+                }
+                memcpy(tmp_copy, tmp, sizeof(files_list_entry_t));
+                tmp_copy->next = NULL;
+                printf("tmp_copy : %s\n", tmp_copy->path_and_name);
+                add_entry_to_tail(&difference, tmp_copy);
             }
             else{
+                if (the_config->verbose || the_config->dry_run) {
+                    printf("\nSame %s\n", result->path_and_name + start_of_dest);
+                }
                 if (mismatch(tmp, result, true)) {
-                    add_entry_to_tail(&difference, tmp);
+                    if (the_config->verbose || the_config->dry_run) {
+                        printf("\nFiles are different, adding %s to the list of files to copy\n", tmp->path_and_name + start_of_src);
+                    }
+                    files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
+                    if (tmp_copy == NULL) {
+                        fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
+                        exit(-1);
+                    }
+                    memcpy(tmp_copy, tmp, sizeof(files_list_entry_t));
+                    tmp_copy->next = NULL;
+                    printf("tmp_copy : %s\n", tmp_copy->path_and_name);
+                    add_entry_to_tail(&difference, tmp_copy);
                 }
             }
             tmp = tmp->next;
         }
 
-        tmp = destination.head;
-        while (tmp != NULL) {
-            copy_entry_to_destination(tmp, the_config);
-            tmp = tmp->next;   
-        }  
+        if (the_config->verbose || the_config->dry_run) {
+            printf("\nFiles to be copied:\n");
+            display_files_list(&difference);
+        }
 
-        free_files_list(&source);
-        free_files_list(&destination);
-        free_files_list(&difference);
-    } else {
+        files_list_entry_t *tmp_dif = difference.head;
+        while (tmp_dif != NULL) {
+            if (the_config->dry_run) {
+                printf("\nWould copy %s\n", tmp_dif->path_and_name);
+            } else {
+                copy_entry_to_destination(tmp_dif, the_config);
+            }
+            tmp_dif = tmp_dif->next;   
+        } 
+        files_list_entry_t *current = difference.head;
+        while (current != NULL) {
+            files_list_entry_t *next = current->next;
+            free(current);  // This frees the memory allocated for tmp_copy
+            current = next;
+        }
+    } /*else {
         files_list_t dest_l, src_l, diff_l; 
         //Parallel enabled so goes into an infinite loop until receiving stop message from both listers
         while(true){
@@ -77,24 +130,10 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
             //I know, the only fucking thing I'm doing is commenting, but hey, its 3am I'm going to bed
 
         }
-    }
+    }*/
 }
 
 
-/*!
- * @brief free_files_list frees the memory allocated for a files list
- * @param list is a pointer to the list to be freed
- */
-void free_files_list(files_list_t *list) {
-    files_list_entry_t *tmp = list->head;
-    while (tmp != NULL) {
-        files_list_entry_t *next = tmp->next;
-        free(tmp);
-        tmp = next;
-    }
-    list->head = NULL;
-    list->tail = NULL;
-}
 
 /*!
  * @brief mismatch tests if two files with the same name (one in source, one in destination) are equal
@@ -110,7 +149,6 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
         fprintf(stderr, "Invalid arguments to mismatch\n");
         exit(-1);
     }
-
     if (lhd->size != rhd->size) {
         return true;
     }
@@ -170,7 +208,8 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
-    // printf("Copying %s to %s\n", source_entry->path_and_name, the_config->destination); debug
+    if (the_config->verbose || the_config->dry_run)
+    printf("Copying %s to %s\n", source_entry->path_and_name, the_config->destination); 
     if (source_entry == NULL || the_config == NULL) {
         fprintf(stderr, "Invalid arguments to copy_entry_to_destination\n");
         exit(-1);
@@ -184,7 +223,8 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
 
     if (source_entry->entry_type == DOSSIER){
         char path[PATH_SIZE];
-        // printf("Creating directory %s\n", source_entry->path_and_name + strlen(the_config->source) + 1); debug
+        if (the_config->verbose || the_config->dry_run)
+        printf("Creating directory %s\n", source_entry->path_and_name + strlen(the_config->source) + 1);
         concat_path(path, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
         mkdir(path, source_entry->mode);
     }
@@ -193,7 +233,8 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
         off_t offset = 0;
         char source_file[PATH_SIZE];
         char destination_file[PATH_SIZE];
-        // printf("Copying file %s\n", source_entry->path_and_name + strlen(the_config->source) + 1); debug
+        if (the_config->verbose || the_config->dry_run)
+        printf("Copying file %s\n", source_entry->path_and_name + strlen(the_config->source) + 1); 
         concat_path(source_file, source, source_entry->path_and_name);
         concat_path(destination_file, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
 

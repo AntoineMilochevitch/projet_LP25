@@ -85,6 +85,7 @@ int add_entry_to_tail(files_list_t *list, files_list_entry_t *entry) {
     entry->next = NULL;
     entry->prev = list->tail;
     if (list->head == NULL) {
+        printf("Head is NULL\n");
         list->head = entry;
     } else {
         list->tail->next = entry;
@@ -108,8 +109,10 @@ files_list_entry_t *find_entry_by_name(files_list_t *list, char *file_path, size
         return NULL;
     }
     char *name = file_path + start_of_src;
+    printf("Looking for %s\n", name);
     files_list_entry_t* cursor = list->head;
     while (cursor != NULL) {
+        printf("Comparing with %s\n", cursor->path_and_name + start_of_dest);
         char *cursor_name = cursor->path_and_name + start_of_dest;
         int cmp = strcmp(cursor_name, name);
         if (cmp == 0) {
