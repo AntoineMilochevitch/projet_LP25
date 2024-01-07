@@ -84,6 +84,5 @@ int set_configuration(configuration_t *the_config, int argc, char *argv[]) {
             strncpy(the_config->destination, argv[optind++], sizeof(the_config->destination));
         }
     }
-
     return 0;
 }

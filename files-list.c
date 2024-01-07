@@ -131,8 +131,9 @@ files_list_entry_t *find_entry_by_name(files_list_t *list, char *file_path, size
  * This function is already provided complete.
  */
 void display_files_list(files_list_t *list) {
-    if (!list)
+    if (!list) {
         return;
+    }
     
     for (files_list_entry_t *cursor=list->head; cursor!=NULL; cursor=cursor->next) {
         printf("%s\n", cursor->path_and_name);
@@ -145,8 +146,9 @@ void display_files_list(files_list_t *list) {
  * This function is already provided complete.
  */
 void display_files_list_reversed(files_list_t *list) {
-    if (!list)
+    if (!list){
         return;
+    }
     
     for (files_list_entry_t *cursor=list->tail; cursor!=NULL; cursor=cursor->prev) {
         printf("%s\n", cursor->path_and_name);
