@@ -120,9 +120,9 @@ void lister_process_loop(lister_configuration_t *parameters) {
     while(loop){
         printf("Waiting for a message lister proccess loop\n");
         fflush(stdout);
-        if(msgrcv(msg_q_id, &message, sizeof(any_message_t) - sizeof(long), config->my_receiver_id, 0) != -1){
+        if(msgrcv(msg_q_id, &message.analyze_dir_command, sizeof(analyze_file_command_t) - sizeof(long), config->my_receiver_id, 0) != -1){
             if (message.analyze_file_command.op_code == COMMAND_CODE_ANALYZE_DIR) {
-                // ... (code omitted for brevity)
+                loop = false;
             } else if (message.simple_command.message == COMMAND_CODE_TERMINATE) {
                 loop = false;
             }

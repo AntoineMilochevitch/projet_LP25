@@ -175,19 +175,17 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
         exit(-1);
     }
     printf("Making files lists in parallel\n");
-    printf("Sending analyze dir commands\n");
-    fflush(stdout);
-    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_SOURCE_LISTER, the_config->source);
-    printf("Sent analyze dir commands\n");
-    fflush(stdout); 
-    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_DESTINATION_LISTER, the_config->destination);
+    //printf("Sending analyze dir commands\n");
+    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, the_config->source);
+    //printf("Sent analyze dir commands\n");
+    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, the_config->destination);
     bool source_loop = true;
     bool destination_loop = true;
     any_message_t message;
     files_list_entry_t *tmp_copy = NULL;
     do{
-        printf("Waiting for messages\n");
-        fflush(stdout);
+        //printf("Waiting for messages\n");
+        //fflush(stdout);
         msgrcv(msg_queue, &message, sizeof(any_message_t) - sizeof(long), MSG_TYPE_TO_MAIN, 0);
         switch (message.list_entry.op_code) {
             case MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER:
