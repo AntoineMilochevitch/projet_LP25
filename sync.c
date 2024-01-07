@@ -175,20 +175,23 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
         fprintf(stderr, "Invalid arguments to make_files_lists_parallel\n");
         exit(-1);
     }
-    printf("msg_queue %d\n", msg_queue);
     printf("Making files lists in parallel\n");
+    printf("Sending analyze dir commands\n");
+    fflush(stdout);
     send_analyze_dir_command(msg_queue, MSG_TYPE_TO_SOURCE_LISTER, the_config->source);
-    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_DESTINATION_LISTER, the_config->destination);
     printf("Sent analyze dir commands\n");
+    fflush(stdout); 
+    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_DESTINATION_LISTER, the_config->destination);
     bool source_loop = true;
     bool destination_loop = true;
     files_list_entry_transmit_t source_response;
     simple_command_t src_end; 
     files_list_entry_transmit_t destination_response;
     simple_command_t dst_end;
-    while (source_loop || destination_loop){
+    do{
         printf("Waiting for messages\n");
-        if (msgrcv(msg_queue, &source_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, 0) != -1){
+        fflush(stdout);
+        if (msgrcv(msg_queue, &source_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, IPC_NOWAIT) != -1){
             if (the_config->verbose || the_config->dry_run) {
                 printf("Received source response\n");
             }
@@ -200,7 +203,7 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
             memcpy(tmp_copy, &source_response.payload, sizeof(files_list_entry_t));
             add_entry_to_tail(src_list, tmp_copy);
         }
-        if (msgrcv(msg_queue, &destination_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, 0) != -1){
+        if (msgrcv(msg_queue, &destination_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, IPC_NOWAIT) != -1){
             if (the_config->verbose || the_config->dry_run) {
                 printf("Received destination response\n");
             }
@@ -212,7 +215,7 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
             memcpy(tmp_copy, &destination_response.payload, sizeof(files_list_entry_t));
             add_entry_to_tail(dst_list, tmp_copy);
         }
-        if (msgrcv(msg_queue, &src_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER, 0) != -1){
+        if (msgrcv(msg_queue, &src_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER, IPC_NOWAIT) != -1){
             if (the_config->verbose || the_config->dry_run) {
                 printf("Received source end\n");
             }
@@ -221,7 +224,7 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
                 source_loop = false;
             }
         }
-        if (msgrcv(msg_queue, &dst_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER, 0) != -1){
+        if (msgrcv(msg_queue, &dst_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER, IPC_NOWAIT) != -1){
             if (the_config->verbose || the_config->dry_run) {
                 printf("Received destination end\n");
             }
@@ -230,7 +233,7 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
                 destination_loop = false;
             }
         }
-    }
+    }while (source_loop || destination_loop);
 }
 
 /*!

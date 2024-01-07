@@ -104,58 +104,63 @@ void lister_process_loop(lister_configuration_t *parameters) {
     //Wait for an analyse_dir_command_t to be send
     //When sent, build a list with only the path of the files 
     lister_configuration_t *config = (lister_configuration_t *)parameters;
-    analyze_dir_command_t message; 
+    any_message_t message; 
     simple_command_t message_end; 
-    int msg_q_id = msgget(parameters->mq_key, 0666);
+    int msg_q_id = msgget(config->mq_key, 0666);
     bool loop = true;
     while(loop){
         printf("Waiting for a message lister proccess loop\n");
-        if(msgrcv(msg_q_id, &message, sizeof(message) - sizeof(long), parameters->my_receiver_id, 0) != -1){
-            loop = false;
+        fflush(stdout);
+        if(msgrcv(msg_q_id, &message, sizeof(any_message_t) - sizeof(long), config->my_receiver_id, 0) != -1){
+            if (message.analyze_file_command.op_code == COMMAND_CODE_ANALYZE_DIR) {
+                // ... (code omitted for brevity)
+            } else if (message.simple_command.message == COMMAND_CODE_TERMINATE) {
+                loop = false;
+            }
         }
     }
     printf("Message received\n");
-    if (message.op_code == COMMAND_CODE_ANALYZE_DIR) {
+    if (message.analyze_file_command.op_code == COMMAND_CODE_ANALYZE_DIR) {
         //The process is asked to make a list out of this directory
         //Build the list 
         files_list_t l; 
         l.head = NULL; 
         l.tail = NULL; 
-        make_list(&l, message.target); 
+        make_list(&l, message.analyze_dir_command.target); 
         //Send the n-th first element of the list to the n analyzers 
         files_list_entry_t *p = l.head;
-        int sent_requests = parameters->analyzers_count;
+        int sent_requests = config->analyzers_count;
         int answer_received = 0; 
         analyze_file_command_t response; 
         while(p != NULL || answer_received != sent_requests){
-            if (msgrcv(msg_q_id, &response, sizeof(response.op_code), parameters->my_receiver_id, 0) != -1) {
+            if (msgrcv(msg_q_id, &response, sizeof(response.op_code), config->my_receiver_id, 0) != -1) {
                 //The lister got an answer from one of the n analyzers 
                 if(response.op_code == COMMAND_CODE_FILE_ANALYZED){
                     //The analyzer finished its work
-                    send_files_list_element(msg_q_id, parameters->my_receiver_id, &response.payload);
+                    send_files_list_element(msg_q_id, config->my_receiver_id, &response.payload);
                     answer_received++; 
                     sent_requests--; 
                 }
                 //If one of the analyzer is unoccupied, send it another element of the list
-                if (sent_requests != parameters->analyzers_count && p != NULL) {
-                    send_analyze_file_command(msg_q_id, parameters->my_recipient_id, p);
+                if (sent_requests != config->analyzers_count && p != NULL) {
+                    send_analyze_file_command(msg_q_id, config->my_recipient_id, p);
                     p = p->next; 
                     answer_received--;
                 }
             }
         }
         //Send the freshly received datas to the main
-        if (parameters->my_receiver_id == MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER){
+        if (config->my_receiver_id == MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER){
             send_list_end(msg_q_id, MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER); 
         }
-        else if (parameters->my_receiver_id == MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER){
+        else if (config->my_receiver_id == MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER){
             send_list_end(msg_q_id, MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER); 
         }
     } 
 
-    if (msgrcv(msg_q_id, &message_end, sizeof(message_end.message), parameters->my_receiver_id, 0) != -1) {
+    if (msgrcv(msg_q_id, &message_end, sizeof(message_end.message), config->my_receiver_id, 0) != -1) {
         if (message_end.message == COMMAND_CODE_TERMINATE) {
-            send_terminate_confirm(msg_q_id, parameters->my_recipient_id);
+            send_terminate_confirm(msg_q_id, config->my_recipient_id);
         }
     }
 }
@@ -167,29 +172,17 @@ void lister_process_loop(lister_configuration_t *parameters) {
 void analyzer_process_loop(analyzer_configuration_t *parameters) {
     //The analyzer puts himself in a waiting state
     analyzer_configuration_t *config = (analyzer_configuration_t *)parameters;
-    analyze_file_command_t message;
-    simple_command_t message_end;
-    int msg_id = msgget(parameters->mq_key, 0666);
-    int loop = 1;
-    while (loop) {
-        if (msgrcv(msg_id, &message, sizeof(message) - sizeof(long), parameters->my_receiver_id, 0) != -1) {
-            get_file_stats(&message.payload);
-            if (message.op_code == COMMAND_CODE_ANALYZE_FILE) {
-                
-                if (parameters->use_md5) {
-                    compute_file_md5(&message.payload);
-                }
-            }
-            send_analyze_file_response(msg_id, parameters->my_recipient_id, &message.payload);
-        }
-        //When a terminaison message is received, it stops the process
-        if (msgrcv(msg_id, &message_end, sizeof(message_end.message), MSG_TYPE_TO_SOURCE_ANALYZERS, 0) != -1) {
-            if (message_end.message == COMMAND_CODE_TERMINATE) {
-                loop = 0;
-                send_terminate_confirm(msg_id, parameters->my_recipient_id); 
+    any_message_t message;
+    int msg_id = msgget(config->mq_key, 0666);
+    do{
+        if (msgrcv(msg_id, &message, sizeof(any_message_t) - sizeof(long), config->my_receiver_id, 0) != -1) {
+            if (message.analyze_file_command.op_code==COMMAND_CODE_ANALYZE_FILE){
+                get_file_stats(&message.analyze_file_command.payload);
+                send_analyze_file_command(msg_id,config->my_recipient_id,&message.analyze_file_command.payload);
             }
         }
-    }
+    } while (message.simple_command.message != COMMAND_CODE_TERMINATE);
+    send_terminate_confirm(msg_id, MSG_TYPE_TO_MAIN);
 }
 
 /*!
