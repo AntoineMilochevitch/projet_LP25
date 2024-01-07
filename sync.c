@@ -183,55 +183,57 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
     send_analyze_dir_command(msg_queue, MSG_TYPE_TO_DESTINATION_LISTER, the_config->destination);
     bool source_loop = true;
     bool destination_loop = true;
-    files_list_entry_transmit_t source_response;
-    simple_command_t src_end; 
-    files_list_entry_transmit_t destination_response;
-    simple_command_t dst_end;
+    any_message_t message;
+    files_list_entry_t *tmp_copy = NULL;
     do{
         printf("Waiting for messages\n");
         fflush(stdout);
-        if (msgrcv(msg_queue, &source_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, IPC_NOWAIT) != -1){
-            if (the_config->verbose || the_config->dry_run) {
-                printf("Received source response\n");
-            }
-            files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
-            if (tmp_copy == NULL) {
-                fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
-                exit(-1);
-            }
-            memcpy(tmp_copy, &source_response.payload, sizeof(files_list_entry_t));
-            add_entry_to_tail(src_list, tmp_copy);
-        }
-        if (msgrcv(msg_queue, &destination_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, IPC_NOWAIT) != -1){
+        msgrcv(msg_queue, &message, sizeof(any_message_t) - sizeof(long), MSG_TYPE_TO_MAIN, 0);
+        switch (message.list_entry.op_code) {
+            case MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER:
+                if (the_config->verbose || the_config->dry_run) {
+                    printf("Received source response\n");
+                }
+                tmp_copy = malloc(sizeof(files_list_entry_t));
+                if (tmp_copy == NULL) {
+                    fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
+                    exit(-1);
+                }
+                memcpy(tmp_copy, &message.list_entry.payload, sizeof(files_list_entry_t));
+                add_entry_to_tail(src_list, tmp_copy);
+                break;
+            
+            case MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER:
             if (the_config->verbose || the_config->dry_run) {
                 printf("Received destination response\n");
             }
-            files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
+            tmp_copy = malloc(sizeof(files_list_entry_t));
             if (tmp_copy == NULL) {
                 fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
                 exit(-1);
             }
-            memcpy(tmp_copy, &destination_response.payload, sizeof(files_list_entry_t));
+            memcpy(tmp_copy, &message.list_entry.payload, sizeof(files_list_entry_t));
             add_entry_to_tail(dst_list, tmp_copy);
-        }
-        if (msgrcv(msg_queue, &src_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER, IPC_NOWAIT) != -1){
-            if (the_config->verbose || the_config->dry_run) {
+                break;
+            
+            case MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER:
+                if (the_config->verbose || the_config->dry_run) {
                 printf("Received source end\n");
-            }
-            if (src_end.message == COMMAND_CODE_LIST_COMPLETE){
-                printf("Source end\n");
+                }
                 source_loop = false;
-            }
-        }
-        if (msgrcv(msg_queue, &dst_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER, IPC_NOWAIT) != -1){
-            if (the_config->verbose || the_config->dry_run) {
-                printf("Received destination end\n");
-            }
-            if (src_end.message == COMMAND_CODE_LIST_COMPLETE){
-                printf("Destination end\n");
+                break;
+            
+            case MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER:
+                if (the_config->verbose || the_config->dry_run) {
+                    printf("Received destination end\n");
+                }
                 destination_loop = false;
-            }
+                break;
+            
+            default:
+                break;
         }
+        
     }while (source_loop || destination_loop);
 }
 
