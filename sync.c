@@ -75,7 +75,7 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
                 if (the_config->verbose || the_config->dry_run) {
                     printf("\nSame %s\n", result->path_and_name + start_of_dest);
                 }
-                if (mismatch(tmp, result, true)) {
+                if (mismatch(tmp, result, the_config->uses_md5)) {
                     if (the_config->verbose || the_config->dry_run) {
                         printf("\nFiles are different, adding %s to the list of files to copy\n", tmp->path_and_name + start_of_src);
                     }
@@ -149,13 +149,7 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
         fprintf(stderr, "Invalid arguments to mismatch\n");
         exit(-1);
     }
-    if (lhd->size != rhd->size) {
-        return true;
-    }
 
-    if (lhd->mtime.tv_nsec != rhd->mtime.tv_nsec || lhd->mtime.tv_sec != rhd->mtime.tv_sec) {
-        return true;
-    }
     if (has_md5) {
         if (lhd->md5sum == NULL || rhd->md5sum == NULL) {
             fprintf(stderr, "MD5 sum not available\n");
@@ -166,7 +160,12 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
                 return true;
             }
         }
-    } 
+    }
+    else{ // date and size only (no md5 : uses_md5 = false in config)
+        if(lhd->mtime.tv_sec == rhd->mtime.tv_sec && lhd->mtime.tv_nsec == rhd->mtime.tv_nsec && lhd->size == rhd->size) {
+            return true;
+        }
+    }
     return false;
 }
 
