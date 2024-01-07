@@ -60,6 +60,23 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
         free_files_list(&source);
         free_files_list(&destination);
         free_files_list(&difference);
+    } else {
+        files_list_t dest_l, src_l, diff_l; 
+        //Parallel enabled so goes into an infinite loop until receiving stop message from both listers
+        while(true){
+            //Ask both listers if they have finished their work
+            //Use a simple_message to do so or maybe send_terminate_command
+
+            //Build the lists 
+            make_files_lists_parallel(&src_l, &dest_l, the_config, p_context->message_queue_id);
+
+            //Build the difference list 
+
+            //Synchronize all of that
+
+            //I know, the only fucking thing I'm doing is commenting, but hey, its 3am I'm going to bed
+
+        }
     }
 }
 
@@ -143,7 +160,7 @@ void make_files_list(files_list_t *list, char *target_path) {
  * @param msg_queue is the id of the MQ used for communication
  */
 void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, configuration_t *the_config, int msg_queue) {
-    
+
 }
 
 /*!

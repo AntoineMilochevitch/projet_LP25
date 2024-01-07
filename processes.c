@@ -34,7 +34,7 @@ int prepare(configuration_t *the_config, process_context_t *p_context) {
             return -1;
         }
 
-        // Create analyzer processes
+        // Create analyzer processes (it is an array since there are many of them)
         p_context->source_analyzers_pids = malloc(sizeof(pid_t) * the_config->processes_count);
         p_context->destination_analyzers_pids = malloc(sizeof(pid_t) * the_config->processes_count);
         for(int i = 0; i < the_config->processes_count; i++){
@@ -86,29 +86,60 @@ int make_process(process_context_t *p_context, process_loop_t func, void *parame
  * @param parameters is a pointer to its parameters, to be cast to a lister_configuration_t
  */
 void lister_process_loop(lister_configuration_t *parameters) {
-    int msg_q_id = msgget(parameters->mq_key, 0666 | IPC_CREAT);
-    //je crois qu'il faut faire ça : 
-    /*
-    - récupérer noms des fichiers via les messages ?
-    - les mettre dans une liste avec les commandes file-list.c ?
-    - Envoyer le tout à l'analyser_process_loop via message ?
-    - Une fois tout ça finit l'envoyer au main ?
-    */
-    //ne pas oublier de fermer les files de messages
-    files_list_entry_transmit_t message; 
-    //Send message to analyser via MQ ??
-    msgsnd(msg_q_id, &message, sizeof(message) - sizeof(long), 0);
-    
+    //Wait for an analyse_dir_command_t to be send
+    //When sent, build a list with only the path of the files 
+    analyze_dir_command_t message; 
+    simple_command_t message_end; 
+    int msg_q_id = msgget(parameters->mq_key, 0666);
+    if(msgrcv(msg_q_id, &message, sizeof(message.op_code), parameters->my_receiver_id, 0) != -1){
+        if(strcmp(message.op_code, COMMAND_CODE_ANALYZE_DIR) == 0){
+            //The process is asked to make a list out of this directory
+            //Build the list 
+            files_list_t l; 
+            l.head = NULL; 
+            l.tail = NULL; 
+            make_list(&l, message.target); 
 
-    //Create file list
-    files_list_t l;
-    l.head = NULL; 
-    l.tail = NULL;
+            //Send the n-th first element of the list to the n analyzers 
+            files_list_entry_t *p = l.head;
+            for(int i = 0; i < parameters->analyzers_count; i++){
+                send_analyze_file_command(msg_q_id, parameters->my_recipient_id, p);
+                p = p->next;
+            }
+            int sent_requests = parameters->analyzers_count;
+            int answer_received = 0; 
+            analyze_file_command_t response; 
+            while(true){
+                if(msgrcv(msg_q_id, &response, sizeof(response.op_code), parameters->my_receiver_id, 0) != -1){
+                    //Check if the lister has to stop its loop 
+                    if(p == NULL && answer_received == sent_requests){
+                        break;
+                    }
 
+                    //The lister got an answer from one of the n analyzers 
+                    if(strcmp(response.op_code, COMMAND_CODE_FILE_ENTRY) == 0){
+                        //The analyzer finished its work
+                        answer_received++; 
+                        sent_requests--; 
+                    }
 
-
-
-    //Once the list is created, send it to 
+                    //If one of the analyzer is unoccupied, send it another element of the list
+                    if(sent_requests != parameters->analyzers_count && p != NULL){
+                        send_analyze_file_command(msg_q_id, parameters->my_recipient_id, p);
+                        p = p->next; 
+                        answer_received--;
+                    }
+                }
+            }
+            //Send the freshly received datas to the main
+            send_list_end(msg_q_id, parameters->my_recipient_id); //???
+        } 
+    }
+    if(msgrcv(msg_q_id, &message_end, sizeof(message_end.message), parameters->my_receiver_id, 0) != -1){
+        if(strcmp(message_end.message, COMMAND_CODE_TERMINATE) == 0){
+            send_terminate_confirm(msg_q_id, parameters->my_recipient_id);
+        }
+    }
 }
 
 /*!
@@ -116,16 +147,14 @@ void lister_process_loop(lister_configuration_t *parameters) {
  * @param parameters is a pointer to its parameters, to be cast to an analyzer_configuration_t
  */
 void analyzer_process_loop(analyzer_configuration_t *parameters) {
-    files_list_entry_transmit_t message;
+    //The analyzer puts himself in a waiting state
+    analyze_file_command_t message;
     simple_command_t message_end;
     int msg_id = msgget(parameters->mq_key, 0666);
     int loop = 1;
     while (loop){
-        if (msgrcv(msg_id, &message, sizeof(message) - sizeof(long), parameters->my_receiver_id, 0) != -1){
-            if (message.op_code == COMMAND_CODE_ANALYZE_DIR){
-                get_file_stats(&message.payload);
-            }
-            if (message.op_code == COMMAND_CODE_ANALYZE_FILE){
+        if(msgrcv(msg_id, &message, sizeof(message) - sizeof(long), parameters->my_receiver_id, 0) != -1){
+            if (strcmp(message.op_code, COMMAND_CODE_ANALYZE_FILE) == 0){
                 get_file_stats(&message.payload);
                 if (parameters->use_md5){
                     compute_file_md5(&message.payload);
@@ -133,12 +162,15 @@ void analyzer_process_loop(analyzer_configuration_t *parameters) {
             }
             send_analyze_file_response(msg_id, parameters->my_recipient_id, &message.payload);
         }
-        if (msgrcv(, &message_end, sizeof(message_end.message), MSG_TYPE_TO_SOURCE_ANALYZERS, 0) != -1){ // je sais pas quoi mettre dans le premier et le 4 destination ou source ?
-            if (message_end.message == COMMAND_CODE_TERMINATE){
+        //When a terminaison message is received, it stops the process
+        if(msgrcv(msg_id, &message_end, sizeof(message_end.message), MSG_TYPE_TO_SOURCE_ANALYZERS, 0) != -1){
+            if (strcmp(message_end.message, COMMAND_CODE_TERMINATE) == 0){
                 loop = 0;
+                send_terminate_confirm(msg_id, parameters->my_recipient_id); 
             }
         }
     }
+    
 }
 
 /*!
