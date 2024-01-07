@@ -155,9 +155,10 @@ void lister_process_loop(lister_configuration_t *parameters) {
         int answer_received = 0; 
         analyze_file_command_t response; 
         while(p != NULL || answer_received != sent_requests){
-            printf("aaaaaaaaaaaaaaaaaaa\n");
-            if (msgrcv(msg_q_id, &response, sizeof(response.op_code), config->my_receiver_id, 0) != -1) {
-                printf("bbbbbbbbbbbbbbbbbb\n");
+            //printf("aaaaaaaaaaaaaaaaaaa\n");
+            ssize_t rcv_result = msgrcv(msg_q_id, &response, sizeof(response.op_code), config->my_receiver_id, IPC_NOWAIT);
+            if (rcv_result != -1) {
+                //printf("bbbbbbbbbbbbbbbbbb\n");
                 //The lister got an answer from one of the n analyzers 
                 if(response.op_code == COMMAND_CODE_FILE_ANALYZED){
                     //The analyzer finished its work
@@ -171,6 +172,14 @@ void lister_process_loop(lister_configuration_t *parameters) {
                     send_analyze_file_command(msg_q_id, config->my_recipient_id, p);
                     p = p->next; 
                     answer_received--;
+                }
+            }
+            else {
+                if (errno != ENOMSG) {
+                    perror("Failed to receive message");
+                    exit(EXIT_FAILURE);
+                } else {
+                    printf("No message of the desired type\n");
                 }
             }
         }
