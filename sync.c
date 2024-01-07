@@ -202,8 +202,9 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
-    if (the_config->verbose || the_config->dry_run)
-    printf("Copying %s to %s\n", source_entry->path_and_name, the_config->destination); 
+    if (the_config->verbose || the_config->dry_run) {
+        printf("Copying %s to %s\n", source_entry->path_and_name, the_config->destination); 
+    }
     if (source_entry == NULL || the_config == NULL) {
         fprintf(stderr, "Invalid arguments to copy_entry_to_destination\n");
         exit(-1);
@@ -215,15 +216,13 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
     // printf("Source : %s\n", source); debug
     // printf("Destination : %s\n", destination); debug
 
-    if (source_entry->entry_type == DOSSIER){
+    if (source_entry->entry_type == DOSSIER) {
         char path[PATH_SIZE];
         if (the_config->verbose || the_config->dry_run)
         printf("Creating directory %s\n", source_entry->path_and_name + strlen(the_config->source) + 1);
         concat_path(path, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
         mkdir(path, source_entry->mode);
-    }
-
-    else{
+    } else {
         off_t offset = 0;
         char source_file[PATH_SIZE];
         char destination_file[PATH_SIZE];
@@ -256,8 +255,9 @@ void make_list(files_list_t *list, char *target) {
         exit(-1);
     }
     DIR *dir;
-    if (!(dir = open_dir(target)))
+    if (!(dir = open_dir(target))) {
         return;
+    }
 
     struct dirent *entry;
     while ((entry = get_next_entry(dir)) != NULL) {

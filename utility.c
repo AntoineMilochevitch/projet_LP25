@@ -26,6 +26,5 @@ char *concat_path(char *result, char *prefix, char *suffix) {
     } else {
         snprintf(result, PATH_SIZE, "%s/%s", prefix, suffix);
     }
-
     return result;
 }
