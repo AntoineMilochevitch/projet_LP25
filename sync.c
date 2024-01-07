@@ -192,7 +192,32 @@ void make_files_list(files_list_t *list, char *target_path) {
  * @param msg_queue is the id of the MQ used for communication
  */
 void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, configuration_t *the_config, int msg_queue) {
-    
+    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, the_config->source);
+    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, the_config->destination);
+    bool source_loop = true;
+    bool destination_loop = true;
+    files_list_entry_transmit_t source_response;
+    simple_command_t src_end; 
+    files_list_entry_transmit_t destination_response;
+    simple_command_t dst_end;
+    while (source_loop || destination_loop){
+        if (msgrcv(msg_queue, &source_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, 0) != -1){
+            add_entry_to_tail(src_list, &source_response.payload);
+        }
+        if (msgrcv(msg_queue, &destination_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, 0) != -1){
+            add_entry_to_tail(dst_list, &destination_response.payload);
+        }
+        if (msgrcv(msg_queue, &src_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER, 0) != -1){
+            if (strcmp(src_end.message, COMMAND_CODE_LIST_COMPLETE) == 0){
+                source_loop = false;
+            }
+        }
+        if (msgrcv(msg_queue, &dst_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER, 0) != -1){
+            if (strcmp(src_end.message, COMMAND_CODE_LIST_COMPLETE) == 0){
+                destination_loop = false;
+            }
+        }
+    }
 }
 
 /*!
