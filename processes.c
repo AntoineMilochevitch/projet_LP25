@@ -100,6 +100,7 @@ int make_process(process_context_t *p_context, process_loop_t func, void *parame
         func(parameters);
         exit(0);
     } else { // Parent process
+        ++p_context->processes_count;
         return pid;
     }
 }
