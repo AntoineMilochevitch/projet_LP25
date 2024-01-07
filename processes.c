@@ -36,16 +36,24 @@ int prepare(configuration_t *the_config, process_context_t *p_context) {
         p_context->message_queue_id = msgget(p_context->shared_key, IPC_CREAT | 0666);
         lister_configuration_t lister_config_dest;
         lister_configuration_t lister_config_src;
+        
         lister_config_src.analyzers_count = the_config->processes_count;
         lister_config_src.my_receiver_id = MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER;
         lister_config_src.my_recipient_id = MSG_TYPE_TO_SOURCE_ANALYZERS;
         lister_config_src.mq_key = p_context->shared_key;
+        
         lister_config_dest.analyzers_count = the_config->processes_count;
         lister_config_dest.my_receiver_id = MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER;
         lister_config_dest.my_recipient_id = MSG_TYPE_TO_DESTINATION_ANALYZERS;
         lister_config_dest.mq_key = p_context->shared_key; 
-        p_context->source_lister_pid = make_process(p_context, lister_process_loop, &lister_config_src);
-        p_context->destination_lister_pid = make_process(p_context, lister_process_loop, &lister_config_dest);
+
+        //Create pointers to function lister_process_loop & analyzers_process_loop
+        process_loop_t LPL, APL;
+        LPL = (void (*) (void *))lister_process_loop; 
+        APL = (void (*) (void *))analyzer_process_loop;  
+
+        p_context->source_lister_pid = make_process(p_context, LPL, &lister_config_src);
+        p_context->destination_lister_pid = make_process(p_context, LPL, &lister_config_dest);
         if (p_context->source_lister_pid == -1 || p_context->destination_lister_pid == -1) { // PID -1 = FAIL
             clean_processes(the_config, p_context);
             return -1;
@@ -63,8 +71,8 @@ int prepare(configuration_t *the_config, process_context_t *p_context) {
             analyser_config_src.my_receiver_id = MSG_TYPE_TO_LISTER_FROM_SOURCE_ANALYZERS;
             analyser_config_src.my_recipient_id = MSG_TYPE_TO_SOURCE_LISTER;
             analyser_config_src.mq_key = p_context->shared_key; 
-            p_context->source_analyzers_pids[i] = make_process(p_context, analyzer_process_loop, &analyser_config_src);
-            p_context->destination_analyzers_pids[i] = make_process(p_context, analyzer_process_loop, &analyser_config_dest); 
+            p_context->source_analyzers_pids[i] = make_process(p_context, APL, &analyser_config_src);
+            p_context->destination_analyzers_pids[i] = make_process(p_context, APL, &analyser_config_dest); 
             if (p_context->destination_analyzers_pids[i] == -1 || p_context->source_analyzers_pids[i] == -1) {
                 //Terminate both listers process
                 kill(p_context->source_lister_pid, 0);
