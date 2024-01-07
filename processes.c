@@ -116,22 +116,35 @@ void lister_process_loop(lister_configuration_t *parameters) {
     any_message_t message; 
     simple_command_t message_end; 
     int msg_q_id = msgget(config->mq_key, 0666);
+    //analyze_dir_command_t test;
+    //int cpt = -1;
     bool loop = true;
+    /*while (cpt == -1){
+        int c = msgrcv(msg_q_id, &test, sizeof(analyze_dir_command_t) - sizeof(long), config->my_receiver_id, IPC_NOWAIT);
+        printf("%s\n", test.target);
+        printf("%d\n", c);
+        cpt++;
+        
+    }*/
     while(loop){
         printf("Waiting for a message lister proccess loop\n");
         fflush(stdout);
-        if(msgrcv(msg_q_id, &message.analyze_dir_command, sizeof(analyze_file_command_t) - sizeof(long), config->my_receiver_id, 0) != -1){
+        if(msgrcv(msg_q_id, &message.analyze_dir_command, sizeof(analyze_dir_command_t) - sizeof(long), config->my_receiver_id, 0) != -1){
+            
             if (message.analyze_file_command.op_code == COMMAND_CODE_ANALYZE_DIR) {
                 loop = false;
             } else if (message.simple_command.message == COMMAND_CODE_TERMINATE) {
                 loop = false;
             }
         }
+        
     }
     printf("Message received\n");
+    
     if (message.analyze_file_command.op_code == COMMAND_CODE_ANALYZE_DIR) {
         //The process is asked to make a list out of this directory
         //Build the list 
+        
         files_list_t l; 
         l.head = NULL; 
         l.tail = NULL; 
@@ -142,10 +155,13 @@ void lister_process_loop(lister_configuration_t *parameters) {
         int answer_received = 0; 
         analyze_file_command_t response; 
         while(p != NULL || answer_received != sent_requests){
+            printf("aaaaaaaaaaaaaaaaaaa\n");
             if (msgrcv(msg_q_id, &response, sizeof(response.op_code), config->my_receiver_id, 0) != -1) {
+                printf("bbbbbbbbbbbbbbbbbb\n");
                 //The lister got an answer from one of the n analyzers 
                 if(response.op_code == COMMAND_CODE_FILE_ANALYZED){
                     //The analyzer finished its work
+                    
                     send_files_list_element(msg_q_id, config->my_receiver_id, &response.payload);
                     answer_received++; 
                     sent_requests--; 
