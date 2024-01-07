@@ -67,8 +67,7 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
             tmp_copy->next = NULL;
             printf("tmp_copy : %s\n", tmp_copy->path_and_name);
             add_entry_to_tail(&difference, tmp_copy);
-        }
-        else{
+        } else {
             if (the_config->verbose || the_config->dry_run) {
                 printf("\nSame %s\n", result->path_and_name + start_of_dest);
             }
