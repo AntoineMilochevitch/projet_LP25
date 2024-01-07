@@ -18,6 +18,7 @@ int send_file_entry(int msg_queue, int recipient, files_list_entry_t *file_entry
     message.mtype = recipient;
     message.op_code = cmd_code;
     memcpy(&message.payload, file_entry, sizeof(files_list_entry_t));
+    message.reply_to = msg_queue;
 
     size_t message_size = sizeof(message) - sizeof(long);
     return msgsnd(msg_queue, &message, message_size, 0);
@@ -31,10 +32,20 @@ int send_file_entry(int msg_queue, int recipient, files_list_entry_t *file_entry
  * @return the result of msgsnd
  */
 int send_analyze_dir_command(int msg_queue, int recipient, char *target_dir) {
+    if (msg_queue == -1) {
+        return -1;
+    }
+    if (target_dir == NULL) {
+        return -1;
+    }
+    if (recipient < 0) {
+        return -1;
+    }
     analyze_dir_command_t message;
     message.mtype = recipient;
     message.op_code = COMMAND_CODE_ANALYZE_DIR;
-    strncpy(message.target, target_dir, sizeof(PATH_SIZE) - 1);
+    strncpy(message.target, target_dir, sizeof(message.target) - 1);
+    message.target[sizeof(message.target) - 1] = '\0';
 
     size_t message_size = sizeof(message) - sizeof(long);
     return msgsnd(msg_queue, &message, message_size, 0);

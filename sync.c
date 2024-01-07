@@ -29,37 +29,52 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
     if (the_config->verbose || the_config->dry_run) {
         printf("Synchronizing %s and %s\n", the_config->source, the_config->destination);
     }
+    files_list_t source = {NULL, NULL};
+     files_list_t destination = {NULL, NULL};
     if (!the_config->is_parallel) {
-        files_list_t source = {NULL, NULL};
         make_files_list(&source, the_config->source);
-
-        if (the_config->verbose || the_config->dry_run) {
+        make_files_list(&destination, the_config->destination);
+    } else {
+        make_files_lists_parallel(&source, &destination, the_config, p_context->message_queue_id);
+    }
+    if (the_config->verbose || the_config->dry_run) {
             printf("\nSource files:\n");
             display_files_list(&source);
-        }
-
-        files_list_t destination = {NULL, NULL};
-        make_files_list(&destination, the_config->destination);
-
-        if (the_config->verbose || the_config->dry_run) {
             printf("\nDestination files:\n");
             display_files_list(&destination);
-        }  
+        }
 
-        files_list_t difference = {NULL, NULL};
-
-        files_list_entry_t *tmp = source.head;
-        files_list_entry_t *result;
-        while (tmp != NULL){
-            size_t start_of_src = strlen(the_config->source) + 1;
-            size_t start_of_dest = strlen(the_config->destination) + 1;
+    files_list_t difference = {NULL, NULL};
+    files_list_entry_t *tmp = source.head;
+    files_list_entry_t *result;
+    while (tmp != NULL){
+        size_t start_of_src = strlen(the_config->source) + 1;
+        size_t start_of_dest = strlen(the_config->destination) + 1;
+        if (the_config->verbose || the_config->dry_run) {
+            printf("\nComparing %s and %s\n", tmp->path_and_name, destination.head->path_and_name);
+        }
+        result = find_entry_by_name(&destination, tmp->path_and_name, start_of_src, start_of_dest);
+        if (result == NULL){
             if (the_config->verbose || the_config->dry_run) {
-                printf("\nComparing %s and %s\n", tmp->path_and_name, destination.head->path_and_name);
+                printf("\nDifferent, adding %s to the list of files to copy\n", tmp->path_and_name + start_of_src);
             }
-            result = find_entry_by_name(&destination, tmp->path_and_name, start_of_src, start_of_dest);
-            if (result == NULL){
+            files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
+            if (tmp_copy == NULL) {
+                fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
+                exit(-1);
+            }
+            memcpy(tmp_copy, tmp, sizeof(files_list_entry_t));
+            tmp_copy->next = NULL;
+            printf("tmp_copy : %s\n", tmp_copy->path_and_name);
+            add_entry_to_tail(&difference, tmp_copy);
+        }
+        else{
+            if (the_config->verbose || the_config->dry_run) {
+                printf("\nSame %s\n", result->path_and_name + start_of_dest);
+            }
+            if (mismatch(tmp, result, the_config->uses_md5)) {
                 if (the_config->verbose || the_config->dry_run) {
-                    printf("\nDifferent, adding %s to the list of files to copy\n", tmp->path_and_name + start_of_src);
+                    printf("\nFiles are different, adding %s to the list of files to copy\n", tmp->path_and_name + start_of_src);
                 }
                 files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
                 if (tmp_copy == NULL) {
@@ -71,61 +86,25 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
                 printf("tmp_copy : %s\n", tmp_copy->path_and_name);
                 add_entry_to_tail(&difference, tmp_copy);
             }
-            else{
-                if (the_config->verbose || the_config->dry_run) {
-                    printf("\nSame %s\n", result->path_and_name + start_of_dest);
-                }
-                if (mismatch(tmp, result, the_config->uses_md5)) {
-                    if (the_config->verbose || the_config->dry_run) {
-                        printf("\nFiles are different, adding %s to the list of files to copy\n", tmp->path_and_name + start_of_src);
-                    }
-                    files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
-                    if (tmp_copy == NULL) {
-                        fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
-                        exit(-1);
-                    }
-                    memcpy(tmp_copy, tmp, sizeof(files_list_entry_t));
-                    tmp_copy->next = NULL;
-                    printf("tmp_copy : %s\n", tmp_copy->path_and_name);
-                    add_entry_to_tail(&difference, tmp_copy);
-                }
-            }
-            tmp = tmp->next;
         }
-
-        if (the_config->verbose || the_config->dry_run) {
-            printf("\nFiles to be copied:\n");
-            display_files_list(&difference);
+        tmp = tmp->next;
+    }
+    if (the_config->verbose || the_config->dry_run) {
+        printf("\nFiles to be copied:\n");
+        display_files_list(&difference);
+    }
+    files_list_entry_t *tmp_dif = difference.head;
+    while (tmp_dif != NULL) {
+        if (the_config->dry_run) {
+            printf("\nWould copy %s\n", tmp_dif->path_and_name);
+        } else {
+            copy_entry_to_destination(tmp_dif, the_config);
         }
-
-        files_list_entry_t *tmp_dif = difference.head;
-        while (tmp_dif != NULL) {
-            if (the_config->dry_run) {
-                printf("\nWould copy %s\n", tmp_dif->path_and_name);
-            } else {
-                copy_entry_to_destination(tmp_dif, the_config);
-            }
-            tmp_dif = tmp_dif->next;   
-        } 
-        clear_files_list(&difference);
-    } /*else {
-        files_list_t dest_l, src_l, diff_l; 
-        //Parallel enabled so goes into an infinite loop until receiving stop message from both listers
-        while(true){
-            //Ask both listers if they have finished their work
-            //Use a simple_message to do so or maybe send_terminate_command
-
-            //Build the lists 
-            make_files_lists_parallel(&src_l, &dest_l, the_config, p_context->message_queue_id);
-
-            //Build the difference list 
-
-            //Synchronize all of that
-
-            //I know, the only fucking thing I'm doing is commenting, but hey, its 3am I'm going to bed
-
-        }
-    }*/
+        tmp_dif = tmp_dif->next;   
+    } 
+    clear_files_list(&difference);
+    clear_files_list(&source);
+    clear_files_list(&destination);
 }
 
 
@@ -192,8 +171,15 @@ void make_files_list(files_list_t *list, char *target_path) {
  * @param msg_queue is the id of the MQ used for communication
  */
 void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, configuration_t *the_config, int msg_queue) {
-    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, the_config->source);
-    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, the_config->destination);
+    if (src_list == NULL || dst_list == NULL || the_config == NULL) {
+        fprintf(stderr, "Invalid arguments to make_files_lists_parallel\n");
+        exit(-1);
+    }
+    printf("msg_queue %d\n", msg_queue);
+    printf("Making files lists in parallel\n");
+    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_SOURCE_LISTER, the_config->source);
+    send_analyze_dir_command(msg_queue, MSG_TYPE_TO_DESTINATION_LISTER, the_config->destination);
+    printf("Sent analyze dir commands\n");
     bool source_loop = true;
     bool destination_loop = true;
     files_list_entry_transmit_t source_response;
@@ -201,19 +187,46 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
     files_list_entry_transmit_t destination_response;
     simple_command_t dst_end;
     while (source_loop || destination_loop){
+        printf("Waiting for messages\n");
         if (msgrcv(msg_queue, &source_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER, 0) != -1){
-            add_entry_to_tail(src_list, &source_response.payload);
+            if (the_config->verbose || the_config->dry_run) {
+                printf("Received source response\n");
+            }
+            files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
+            if (tmp_copy == NULL) {
+                fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
+                exit(-1);
+            }
+            memcpy(tmp_copy, &source_response.payload, sizeof(files_list_entry_t));
+            add_entry_to_tail(src_list, tmp_copy);
         }
         if (msgrcv(msg_queue, &destination_response, sizeof(analyze_file_command_t) - sizeof(long), MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER, 0) != -1){
-            add_entry_to_tail(dst_list, &destination_response.payload);
+            if (the_config->verbose || the_config->dry_run) {
+                printf("Received destination response\n");
+            }
+            files_list_entry_t *tmp_copy = malloc(sizeof(files_list_entry_t));
+            if (tmp_copy == NULL) {
+                fprintf(stderr, "Failed to allocate memory for tmp_copy\n");
+                exit(-1);
+            }
+            memcpy(tmp_copy, &destination_response.payload, sizeof(files_list_entry_t));
+            add_entry_to_tail(dst_list, tmp_copy);
         }
         if (msgrcv(msg_queue, &src_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER, 0) != -1){
-            if (strcmp(src_end.message, COMMAND_CODE_LIST_COMPLETE) == 0){
+            if (the_config->verbose || the_config->dry_run) {
+                printf("Received source end\n");
+            }
+            if (src_end.message == COMMAND_CODE_LIST_COMPLETE){
+                printf("Source end\n");
                 source_loop = false;
             }
         }
         if (msgrcv(msg_queue, &dst_end, sizeof(char), MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER, 0) != -1){
-            if (strcmp(src_end.message, COMMAND_CODE_LIST_COMPLETE) == 0){
+            if (the_config->verbose || the_config->dry_run) {
+                printf("Received destination end\n");
+            }
+            if (src_end.message == COMMAND_CODE_LIST_COMPLETE){
+                printf("Destination end\n");
                 destination_loop = false;
             }
         }
