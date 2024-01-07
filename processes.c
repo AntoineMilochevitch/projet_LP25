@@ -27,7 +27,16 @@ int prepare(configuration_t *the_config, process_context_t *p_context) {
         return 0;
     } else {
         //Create lister for both dest & src 
-        lister_configuration_t *lister_config_dest, *lister_config_src; 
+        lister_configuration_t *lister_config_dest = (lister_configuration_t *) malloc(sizeof(lister_configuration_t));
+        lister_configuration_t *lister_config_src = (lister_configuration_t *) malloc(sizeof(lister_configuration_t));
+        lister_config_src->analyzers_count = the_config->processes_count;
+        lister_config_src->my_receiver_id = MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER;
+        lister_config_src->my_recipient_id = MSG_TYPE_TO_SOURCE_ANALYZERS;
+        lister_config_src->mq_key = p_context->shared_key;
+        lister_config_dest->analyzers_count = the_config->processes_count;
+        lister_config_dest->my_receiver_id = MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER;
+        lister_config_dest->my_recipient_id = MSG_TYPE_TO_DESTINATION_ANALYZERS;
+        lister_config_dest->mq_key = p_context->shared_key; 
         p_context->source_lister_pid = make_process(p_context, lister_process_loop, lister_config_src);
         p_context->destination_lister_pid = make_process(p_context, lister_process_loop, lister_config_dest);
         if (p_context->source_lister_pid == -1 || p_context->destination_lister_pid == -1) { // PID -1 = FAIL
@@ -38,7 +47,14 @@ int prepare(configuration_t *the_config, process_context_t *p_context) {
         p_context->source_analyzers_pids = malloc(sizeof(pid_t) * the_config->processes_count);
         p_context->destination_analyzers_pids = malloc(sizeof(pid_t) * the_config->processes_count);
         for (int i = 0; i < the_config->processes_count; i++) {
-            analyzer_configuration_t *analyser_config_dest, *analyser_config_src; 
+            analyzer_configuration_t *analyser_config_dest = (analyzer_configuration_t *) malloc(sizeof(analyzer_configuration_t));
+            analyser_config_dest->my_receiver_id = MSG_TYPE_TO_LISTER_FROM_DESTINATION_ANALYZERS;
+            analyser_config_dest->my_recipient_id = MSG_TYPE_TO_DESTINATION_LISTER;
+            analyser_config_dest->mq_key = p_context->shared_key;
+            analyzer_configuration_t *analyser_config_src = (analyzer_configuration_t *) malloc(sizeof(analyzer_configuration_t));
+            analyser_config_src->my_receiver_id = MSG_TYPE_TO_LISTER_FROM_SOURCE_ANALYZERS;
+            analyser_config_src->my_recipient_id = MSG_TYPE_TO_SOURCE_LISTER;
+            analyser_config_src->mq_key = p_context->shared_key; 
             p_context->source_analyzers_pids[i] = make_process(p_context, analyzer_process_loop, analyser_config_src);
             p_context->destination_analyzers_pids[i] = make_process(p_context, analyzer_process_loop, analyser_config_dest); 
             if (p_context->destination_analyzers_pids[i] == -1 || p_context->source_analyzers_pids[i] == -1) {
@@ -82,7 +98,12 @@ void lister_process_loop(lister_configuration_t *parameters) {
     analyze_dir_command_t message; 
     simple_command_t message_end; 
     int msg_q_id = msgget(parameters->mq_key, 0666);
-    if (msgrcv(msg_q_id, &message, sizeof(message.op_code), parameters->my_receiver_id, 0) != -1) {
+    bool loop = true;
+    while(loop){
+        if(msgrcv(msg_q_id, &message, sizeof(message.op_code), parameters->my_receiver_id, 0) != -1){
+            loop = false;
+        }
+    }
         if (strcmp(message.op_code, COMMAND_CODE_ANALYZE_DIR) == 0) {
             //The process is asked to make a list out of this directory
             //Build the list 
@@ -93,23 +114,15 @@ void lister_process_loop(lister_configuration_t *parameters) {
 
             //Send the n-th first element of the list to the n analyzers 
             files_list_entry_t *p = l.head;
-            for (int i = 0; i < parameters->analyzers_count; i++) {
-                send_analyze_file_command(msg_q_id, parameters->my_recipient_id, p);
-                p = p->next;
-            }
             int sent_requests = parameters->analyzers_count;
             int answer_received = 0; 
             analyze_file_command_t response; 
-            while(true) {
+            while(p != NULL || answer_received != sent_requests){
                 if (msgrcv(msg_q_id, &response, sizeof(response.op_code), parameters->my_receiver_id, 0) != -1) {
-                    //Check if the lister has to stop its loop 
-                    if (p == NULL && answer_received == sent_requests) {
-                        break;
-                    }
-
                     //The lister got an answer from one of the n analyzers 
-                    if (strcmp(response.op_code, COMMAND_CODE_FILE_ENTRY) == 0) {
+                    if(strcmp(response.op_code, COMMAND_CODE_FILE_ANALYZED) == 0){
                         //The analyzer finished its work
+                        send_files_list_element(msg_q_id, parameters->my_receiver_id, &response.payload);
                         answer_received++; 
                         sent_requests--; 
                     }
@@ -123,9 +136,14 @@ void lister_process_loop(lister_configuration_t *parameters) {
                 }
             }
             //Send the freshly received datas to the main
-            send_list_end(msg_q_id, parameters->my_recipient_id); //???
+            if (parameters->my_receiver_id == MSG_TYPE_TO_MAIN_FROM_DESTINATION_LISTER){
+                send_list_end(msg_q_id, MSG_TYPE_TO_MAIN_FROM_END_DEST_LISTER); 
+            }
+            else if (parameters->my_receiver_id == MSG_TYPE_TO_MAIN_FROM_SOURCE_LISTER){
+                send_list_end(msg_q_id, MSG_TYPE_TO_MAIN_FROM_END_SRC_LISTER); 
+            }
         } 
-    }
+    
     if (msgrcv(msg_q_id, &message_end, sizeof(message_end.message), parameters->my_receiver_id, 0) != -1) {
         if (strcmp(message_end.message, COMMAND_CODE_TERMINATE) == 0) {
             send_terminate_confirm(msg_q_id, parameters->my_recipient_id);
@@ -145,8 +163,9 @@ void analyzer_process_loop(analyzer_configuration_t *parameters) {
     int loop = 1;
     while (loop) {
         if (msgrcv(msg_id, &message, sizeof(message) - sizeof(long), parameters->my_receiver_id, 0) != -1) {
+            get_file_stats(&message.payload);
             if (strcmp(message.op_code, COMMAND_CODE_ANALYZE_FILE) == 0) {
-                get_file_stats(&message.payload);
+                
                 if (parameters->use_md5) {
                     compute_file_md5(&message.payload);
                 }
